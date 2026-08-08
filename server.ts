@@ -282,7 +282,7 @@ app.post("/api/gemini/chat", async (req, res) => {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.6-flash",
         contents,
         config: {
           systemInstruction,
@@ -415,7 +415,7 @@ Yêu cầu trả về cấu trúc JSON chính xác theo schema sau:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -556,7 +556,7 @@ app.post("/api/gemini/analyze-exam", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents,
       config: {
         systemInstruction,
@@ -645,7 +645,7 @@ app.post("/api/gemini/summarize-lesson", async (req, res) => {
     5. Bộ 3 câu hỏi trắc nghiệm nhanh (Quiz) ôn luyện có đáp án và giải thích ngắn.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -790,7 +790,7 @@ app.post("/api/gemini/parse-uploaded-exercise", async (req, res) => {
       "Hãy đảm bảo tất cả các câu hỏi trích xuất đều có nội dung chính xác, công thức rõ ràng, và đáp án khoa học.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents,
       config: {
         systemInstruction,
