@@ -1,0 +1,8 @@
+{
+  "name": "PhysicsAI 12",
+  "description": "Hệ thống LMS dạy và học môn Vật lí 12 tích hợp trợ lý AI, phòng thí nghiệm tương tác ảo, công cụ tạo và phân tích đề kiểm tra theo GDPT 2018.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

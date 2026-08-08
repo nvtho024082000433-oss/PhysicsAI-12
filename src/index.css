@@ -1,0 +1,1057 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Base resets & Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #0ea5e9;
+}
+
+/* ==========================================================================
+   BRIGHT & ENGAGING PHYSICS PORTAL THEME OVERRIDES
+   ========================================================================== */
+
+/* 1. App Container & Lab Notebook Grid paper background */
+#physics-app, 
+.min-h-screen {
+  background: 
+    linear-gradient(to right, rgba(14, 165, 233, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 165, 233, 0.04) 1px, transparent 1px),
+    linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 50%, #f5f3ff 100%) !important;
+  background-size: 20px 20px, 20px 20px, auto !important;
+  background-attachment: fixed !important;
+  color: #0f172a !important;
+}
+
+/* 2. Brand Identity Header & Title styles */
+h1, h2, h3, h4, .font-bold {
+  font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+  font-weight: 700;
+}
+
+/* 3. Sidebar Layout Override - Soft gradient pastel blue-to-indigo for warmth & focus */
+aside {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 4px 0 20px rgba(15, 23, 42, 0.03) !important;
+}
+
+aside h1 {
+  color: #0f172a !important;
+}
+
+/* Sidebar navigation buttons */
+aside nav button {
+  color: #475569 !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s ease-in-out !important;
+}
+aside nav button:hover {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+}
+/* Active state button */
+aside nav button.bg-cyan-500\/10,
+aside nav button[class*="bg-cyan-500"] {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #0284c7 !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+}
+aside nav button.bg-cyan-500\/10 span,
+aside nav button[class*="bg-cyan-500"] span {
+  color: #ffffff !important;
+}
+aside nav button.bg-cyan-500\/10 svg,
+aside nav button[class*="bg-cyan-500"] svg {
+  color: #ffffff !important;
+}
+
+/* Profile cards in sidebar */
+aside div[class*="bg-slate-950"],
+aside .bg-slate-950 {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+}
+aside div[class*="bg-slate-950"] p,
+aside .bg-slate-950 p {
+  color: #1e293b !important;
+}
+aside div[class*="bg-slate-950"] button,
+aside .bg-slate-950 button {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+aside div[class*="bg-slate-950"] button:hover {
+  background-color: #fee2e2 !important;
+  color: #ef4444 !important;
+  border-color: #fca5a5 !important;
+}
+
+/* Inactive button backgrounds */
+button[class*="bg-slate-900"],
+button[class*="bg-slate-950"],
+.bg-slate-900,
+.bg-slate-950 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* 4. Upper Header Override */
+header {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  backdrop-filter: blur(16px) !important;
+}
+header h2 {
+  color: #0f172a !important;
+}
+header p {
+  color: #64748b !important;
+}
+
+/* 5. Clean, White Card overrides */
+.bg-slate-900\/60:not(.no-override):not(.no-override-bg),
+.bg-slate-900\/40:not(.no-override):not(.no-override-bg),
+.bg-slate-900:not(.no-override):not(.no-override-bg),
+.bg-slate-950\/60:not(.no-override):not(.no-override-bg),
+.bg-slate-950\/80:not(.no-override):not(.no-override-bg),
+.bg-slate-950:not(.no-override):not(.no-override-bg),
+.bg-slate-900\/20:not(.no-override):not(.no-override-bg),
+div[class*="bg-slate-900"]:not(.no-override):not(.no-override-bg),
+div[class*="bg-slate-950"]:not(.no-override):not(.no-override-bg),
+div[class*="bg-slate-900\/60"]:not(.no-override):not(.no-override-bg),
+div[class*="bg-slate-900\/40"]:not(.no-override):not(.no-override-bg),
+div[class*="bg-slate-950\/60"]:not(.no-override):not(.no-override-bg) {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Prevent gradients and special colored classes from being flattened to flat white */
+.bg-gradient-to-r,
+.bg-gradient-to-tr,
+.bg-gradient-to-br,
+.bg-gradient-to-l,
+.bg-gradient-to-t,
+.no-override-bg {
+  background-color: transparent !important;
+}
+
+/* Correct card headers and lists */
+.bg-slate-950\/60 border, .bg-slate-900\/60 border {
+  border-color: #e2e8f0 !important;
+}
+
+/* Tab selector bars inside containers */
+div[class*="bg-slate-950 p-1"],
+div[class*="bg-slate-900\/40 border"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Unselected tab buttons */
+div[class*="bg-slate-950 p-1"] button:not([class*="bg-cyan-500"]),
+div[class*="bg-slate-950 p-1"] button:not([class*="bg-cyan-400"]),
+div[class*="bg-slate-900\/40 border"] button:not([class*="bg-cyan-500"]) {
+  color: #64748b !important;
+  background-color: transparent !important;
+}
+div[class*="bg-slate-950 p-1"] button:not([class*="bg-cyan-500"]):hover,
+div[class*="bg-slate-900\/40 border"] button:not([class*="bg-cyan-500"]):hover {
+  color: #0f172a !important;
+  background-color: #e2e8f0 !important;
+}
+
+/* 6. Universal Typography Overrides */
+.text-slate-100,
+.text-slate-200,
+.text-slate-300 {
+  color: #334155 !important;
+}
+
+/* Preserve light/white texts inside active gradients and custom dark elements */
+.text-white,
+.text-white-force,
+.bg-gradient-to-r .text-white,
+.bg-gradient-to-tr .text-white,
+.bg-gradient-to-br .text-white,
+.bg-cyan-500 .text-white,
+.bg-sky-500 .text-white,
+.bg-indigo-600 .text-white,
+.bg-purple-500 .text-white,
+.bg-pink-500 .text-white,
+.bg-slate-950 .text-white,
+.no-override-text-white,
+.no-override-text-white * {
+  color: #ffffff !important;
+}
+
+.bg-gradient-to-r .text-slate-100,
+.bg-gradient-to-tr .text-slate-100,
+.bg-gradient-to-br .text-slate-100,
+.no-override-text-white .text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+.bg-gradient-to-r .text-slate-200,
+.bg-gradient-to-tr .text-slate-200,
+.bg-gradient-to-br .text-slate-200,
+.no-override-text-white .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+.bg-gradient-to-r .text-slate-300,
+.bg-gradient-to-tr .text-slate-300,
+.bg-gradient-to-br .text-slate-300,
+.no-override-text-white .text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.bg-gradient-to-r .text-slate-400,
+.bg-gradient-to-tr .text-slate-400,
+.bg-gradient-to-br .text-slate-400,
+.no-override-text-white .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.text-slate-400,
+.text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Preserve specific colored text */
+.text-cyan-400, .text-cyan-500, .text-cyan-300 {
+  color: #0284c7 !important; /* sky-600 */
+}
+.text-purple-400, .text-purple-500 {
+  color: #7c3aed !important; /* violet-600 */
+}
+.text-emerald-400, .text-emerald-500 {
+  color: #059669 !important; /* emerald-600 */
+}
+.text-amber-400, .text-amber-500 {
+  color: #d97706 !important; /* amber-600 */
+}
+.text-red-400, .text-red-500 {
+  color: #dc2626 !important; /* red-600 */
+}
+
+/* Correct formula and code labels */
+.font-mono.text-slate-500 {
+  color: #475569 !important;
+}
+
+/* 7. Input and form element overrides */
+input, select, textarea {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #0ea5e9 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15) !important;
+}
+
+/* 8. Specific Card elements & list items */
+div[class*="hover:border-slate-800"]:hover,
+div[class*="hover:border-slate-700"]:hover,
+div[class*="hover:bg-slate-900"]:hover {
+  border-color: #38bdf8 !important;
+  background-color: #f0f9ff !important;
+  box-shadow: 0 10px 20px -5px rgba(14, 165, 233, 0.08) !important;
+}
+
+/* 9. Action buttons */
+button.bg-cyan-500,
+button.bg-cyan-400,
+button[class*="bg-cyan-500"],
+button[class*="bg-cyan-400"],
+a.bg-cyan-500 {
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+button.bg-cyan-500:hover,
+button.bg-cyan-400:hover,
+button[class*="bg-cyan-500"]:hover,
+button[class*="bg-cyan-400"]:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%) !important;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.25) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Purple action buttons */
+button.bg-purple-500,
+button[class*="bg-purple-500"] {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Standard border overrides */
+.border-slate-800,
+.border-slate-900,
+.border-slate-850,
+.border-slate-900\/60,
+.border-slate-950 {
+  border-color: #e2e8f0 !important;
+}
+
+/* 10. Grade 12 Physics custom illustrations (Pure CSS floating visual guides) */
+.physics-atom-container {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  opacity: 0.12;
+  pointer-events: none;
+  animation: floatSlow 12s infinite ease-in-out;
+}
+.physics-atom-nucleus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px #ef4444;
+}
+.physics-atom-orbit-1, .physics-atom-orbit-2, .physics-atom-orbit-3 {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 80px;
+  height: 80px;
+  border: 1px dashed #0284c7;
+  border-radius: 50%;
+}
+.physics-atom-orbit-1 { transform: rotateX(65deg) rotateY(15deg); }
+.physics-atom-orbit-2 { transform: rotateX(65deg) rotateY(65deg) rotateZ(30deg); }
+.physics-atom-orbit-3 { transform: rotateX(15deg) rotateY(65deg); }
+
+/* Custom animations */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(180deg); }
+}
+
+@keyframes pulseSlow {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+/* Curriculum view specific enhancements */
+.curriculum-lesson-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: 1.5px solid #f1f5f9 !important;
+  background-color: #ffffff !important;
+}
+.curriculum-lesson-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 12px 24px -8px rgba(14, 165, 233, 0.15) !important;
+}
+
+/* Make sure simulator containers display beautiful white backgrounds */
+.simulation-canvas-container {
+  background-color: #f8fafc !important;
+  border: 1.5px solid #e2e8f0 !important;
+}
+
+/* Slide and pdf views inside curriculum */
+div[class*="bg-cyan-950\/20"] {
+  background-color: #f0f9ff !important;
+  border-color: #bae6fd !important;
+  color: #0369a1 !important;
+}
+div[class*="bg-cyan-950\/20"] p {
+  color: #0369a1 !important;
+}
+
+/* 11. Gamification badges & progress stats */
+.bg-gradient-to-tr {
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.15) !important;
+}
+
+/* 12. Outstanding contrasts for branding cards */
+.brand-teacher-text {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* 13. Outstanding dashboard highlight styles */
+.highlight-personal-card {
+  background: linear-gradient(135deg, #f5f3ff 0%, #fae8ff 50%, #fdf2f8 100%) !important;
+  border: 1.5px solid #c084fc !important;
+  box-shadow: 0 10px 25px -5px rgba(168, 85, 247, 0.15), 0 8px 10px -6px rgba(168, 85, 247, 0.1) !important;
+  color: #1e1b4b !important;
+}
+
+.highlight-personal-card h3 {
+  color: #4c1d95 !important; /* purple-900 */
+  font-weight: 800 !important;
+}
+
+.highlight-personal-card p,
+.highlight-personal-card span {
+  color: #3b0764 !important; /* purple-950 */
+}
+
+.highlight-personal-card .bg-purple-600\/10 {
+  background-color: #f3e8ff !important;
+  border-color: #c084fc !important;
+}
+
+.highlight-personal-card .text-purple-800 {
+  color: #7c3aed !important; /* violet-600 */
+  font-weight: 900 !important;
+}
+
+.highlight-personal-card button {
+  background-color: #ffffff !important;
+  border-color: #c084fc !important;
+  color: #7c3aed !important;
+  font-weight: 800 !important;
+}
+
+.highlight-personal-card button:hover {
+  background-color: #f3e8ff !important;
+  color: #5b21b6 !important;
+}
+
+.highlight-target-card {
+  background: linear-gradient(135deg, #ecfeff 0%, #f0fdf4 50%, #f0fdfa 100%) !important;
+  border: 1.5px solid #34d399 !important;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.15), 0 8px 10px -6px rgba(16, 185, 129, 0.1) !important;
+  color: #022c22 !important;
+}
+
+.highlight-target-card h3 {
+  color: #064e3b !important; /* emerald-950 */
+  font-weight: 800 !important;
+}
+
+.highlight-target-card span {
+  color: #064e3b !important; /* emerald-950 */
+}
+
+.highlight-target-card .bg-emerald-600\/15 {
+  background-color: #d1fae5 !important;
+  border-color: #6ee7b7 !important;
+}
+
+.highlight-target-card .text-emerald-700 {
+  color: #065f46 !important;
+  font-weight: 900 !important;
+}
+
+.highlight-target-card .bg-cyan-600\/15 {
+  background-color: #ecfeff !important;
+  border-color: #67e8f9 !important;
+}
+
+.highlight-target-card .text-cyan-700 {
+  color: #0891b2 !important;
+  font-weight: 900 !important;
+}
+
+.highlight-target-card .bg-pink-500\/15 {
+  background-color: #fdf2f8 !important;
+  border-color: #f9a8d4 !important;
+}
+
+.highlight-target-card .text-pink-700 {
+  color: #db2777 !important;
+  font-weight: 900 !important;
+}
+
+.highlight-quests-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fffbeb 50%, #fff7ed 100%) !important;
+  border: 1.5px solid #facc15 !important;
+  box-shadow: 0 10px 25px -5px rgba(234, 179, 8, 0.15), 0 8px 10px -6px rgba(234, 179, 8, 0.1) !important;
+  color: #1e293b !important;
+}
+
+.highlight-quests-card h3 {
+  color: #78350f !important; /* amber-900 */
+  font-weight: 800 !important;
+}
+
+.highlight-quests-item-active {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border: 1.5px solid #bae6fd !important;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08) !important;
+}
+
+.highlight-quests-item-active span {
+  color: #0f172a !important; /* ultra high contrast slate-900 */
+}
+
+.highlight-quests-item-inactive {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border: 1.5px solid #e2e8f0 !important;
+}
+
+.highlight-quests-item-inactive span {
+  color: #475569 !important; /* high contrast slate-600 */
+}
+
+.highlight-badge-container {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+  border: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(148, 163, 184, 0.15) !important;
+}
+
+.highlight-badge-container h3 {
+  color: #0f172a !important; /* slate-900 */
+  font-weight: 800 !important;
+}
+
+.highlight-badge-thukhoa {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+  color: #78350f !important;
+}
+
+.highlight-badge-thukhoa span {
+  color: #78350f !important;
+}
+
+.highlight-badge-sieutoc {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+  border: 2px solid #3b82f6 !important;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+  color: #1e3a8a !important;
+}
+
+.highlight-badge-sieutoc span {
+  color: #1e3a8a !important;
+}
+
+/* 14. Outstanding high-contrast lesson list buttons */
+.highlight-lesson-btn {
+  background: linear-gradient(135deg, #f0fdf4 0%, #f0f9ff 100%) !important; /* light soft green-blue gradient */
+  border: 1.8px solid #cbd5e1 !important; /* much more visible border */
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.03) !important; /* beautiful floating shadow */
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform: translateY(0) !important;
+}
+
+.highlight-lesson-btn:hover {
+  background: linear-gradient(135deg, #ecfeff 0%, #e0f2fe 100%) !important; /* brighter bright cyan-sky gradient */
+  border-color: #0ea5e9 !important; /* vibrant blue border */
+  box-shadow: 0 10px 20px rgba(14, 165, 233, 0.16), 0 4px 8px rgba(14, 165, 233, 0.08) !important; /* outstanding floating shadow */
+  transform: translateY(-3px) !important; /* lifts up more */
+}
+
+.highlight-lesson-num-badge {
+  background-color: #ffffff !important;
+  border: 1.5px solid #0ea5e9 !important; /* outstanding border for badge */
+  color: #0369a1 !important; /* rich blue */
+  font-weight: 900 !important;
+  box-shadow: 0 2px 4px rgba(14, 165, 233, 0.1) !important;
+}
+
+.highlight-lesson-btn:hover .highlight-lesson-num-badge {
+  background-color: #0ea5e9 !important; /* sky-500 fill on hover */
+  border-color: #0284c7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 8px rgba(14, 165, 233, 0.2) !important;
+}
+
+.highlight-lesson-title {
+  color: #0f172a !important; /* ultra dark high contrast */
+  font-weight: 900 !important; /* extra bold */
+}
+
+.highlight-lesson-btn:hover .highlight-lesson-title {
+  color: #0284c7 !important; /* vibrant sky-700 on hover */
+}
+
+.highlight-lesson-desc {
+  color: #1e293b !important; /* dark slate-800 for high visibility */
+  font-weight: 600 !important;
+}
+
+.highlight-lesson-btn:hover .highlight-lesson-desc {
+  color: #0f172a !important; /* ultra dark slate-900 on hover */
+}
+
+/* 15. Premium Bright & High Contrast Sidebar & Profile Elements */
+.sidebar-btn-active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1.5px solid #0284c7 !important;
+  box-shadow: 0 8px 18px rgba(2, 132, 199, 0.3) !important; /* more intense shadow */
+  transform: translateY(-1px) !important;
+}
+
+.sidebar-btn-active span {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+.sidebar-btn-active svg {
+  color: #ffffff !important;
+}
+
+.sidebar-btn-inactive {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important; /* white/slate soft background */
+  color: #0f172a !important; /* ultra high contrast slate-900 */
+  border: 1.8px solid #cbd5e1 !important; /* clearly defined border */
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02) !important; /* floating shadow */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.sidebar-btn-inactive span {
+  color: #0f172a !important; /* ultra high contrast slate-900 */
+  font-weight: 800 !important; /* font black */
+}
+
+.sidebar-btn-inactive svg {
+  color: #334155 !important; /* dark slate-700 */
+}
+
+.sidebar-btn-inactive:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%) !important; /* light sky blue gradient */
+  border-color: #38bdf8 !important; /* bright cyan border */
+  color: #0369a1 !important;
+  box-shadow: 0 8px 16px rgba(3, 105, 161, 0.15) !important; /* stronger hover shadow */
+  transform: translateY(-2px) !important; /* floats up */
+}
+
+.sidebar-btn-inactive:hover span {
+  color: #0369a1 !important;
+  font-weight: 900 !important;
+}
+
+.sidebar-btn-inactive:hover svg {
+  color: #0369a1 !important;
+}
+
+.sidebar-profile-card {
+  background-color: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+}
+
+.sidebar-profile-name {
+  color: #0f172a !important; /* slate-900 */
+  font-weight: 800 !important;
+}
+
+.sidebar-role-container {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.sidebar-role-btn-active {
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.15) !important;
+}
+
+.sidebar-role-btn-inactive {
+  background-color: transparent !important;
+  color: #475569 !important; /* slate-600 */
+  font-weight: 700 !important;
+}
+
+.sidebar-role-btn-inactive:hover {
+  color: #0f172a !important; /* slate-900 */
+  background-color: #e2e8f0 !important;
+}
+
+.sidebar-stats-card {
+  background-color: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+}
+
+.sidebar-stats-card span {
+  color: #0f172a !important; /* slate-900 */
+  font-weight: 800 !important;
+}
+
+/* ==========================================================================
+   CUSTOM 3D TACTILE PASTEL BLOCKS WITH HIGH CONTRAST TYPOGRAPHY
+   ========================================================================== */
+.block-3d-sky, .block-3d-amber, .block-3d-emerald, .block-3d-rose, .block-3d-purple, .block-3d-slate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.block-3d-sky {
+  background-color: #f0f9ff !important;
+  border: 2px solid #0284c7 !important;
+  box-shadow: 4px 4px 0px 0px #0ea5e9 !important;
+  color: #0369a1 !important;
+}
+.block-3d-sky:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0ea5e9 !important;
+}
+
+.block-3d-amber {
+  background-color: #fffbeb !important;
+  border: 2px solid #d97706 !important;
+  box-shadow: 4px 4px 0px 0px #f59e0b !important;
+  color: #78350f !important;
+}
+.block-3d-amber:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #f59e0b !important;
+}
+
+.block-3d-emerald {
+  background-color: #f0fdf4 !important;
+  border: 2px solid #059669 !important;
+  box-shadow: 4px 4px 0px 0px #10b981 !important;
+  color: #064e3b !important;
+}
+.block-3d-emerald:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #10b981 !important;
+}
+
+.block-3d-rose {
+  background-color: #fff1f2 !important;
+  border: 2px solid #dc2626 !important;
+  box-shadow: 4px 4px 0px 0px #f43f5e !important;
+  color: #7f1d1d !important;
+}
+.block-3d-rose:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #f43f5e !important;
+}
+
+.block-3d-purple {
+  background-color: #faf5ff !important;
+  border: 2px solid #7c3aed !important;
+  box-shadow: 4px 4px 0px 0px #a855f7 !important;
+  color: #4c1d95 !important;
+}
+.block-3d-purple:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #a855f7 !important;
+}
+
+.block-3d-slate {
+  background-color: #f8fafc !important;
+  border: 2px solid #475569 !important;
+  box-shadow: 4px 4px 0px 0px #64748b !important;
+  color: #0f172a !important;
+}
+.block-3d-slate:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #64748b !important;
+}
+
+/* ==========================================================================
+   EXCLUSIVE 3D EXAM MANAGER THEMING (NEO-PHYSICS TACTILE THEME)
+   ========================================================================== */
+
+/* 1. Gentle Pastel Background Layouts with High-Contrast Slate Borders */
+.bg-exam-soft-cream {
+  background-color: #faf8f5 !important;
+}
+.bg-exam-soft-sky {
+  background-color: #f1f8fe !important;
+}
+.bg-exam-soft-lavender {
+  background-color: #f6f5ff !important;
+}
+.bg-exam-soft-mint {
+  background-color: #f2fbf7 !important;
+}
+
+/* 2. Tactile 3D Cards */
+.card-3d-slate {
+  background-color: #ffffff !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 4px 4px 0px 0px #0f172a !important;
+  border-radius: 16px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.card-3d-slate:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0f172a !important;
+}
+
+.card-3d-sky {
+  background-color: #f1f8fe !important;
+  border: 2px solid #0284c7 !important;
+  box-shadow: 4px 4px 0px 0px #0284c7 !important;
+  border-radius: 16px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.card-3d-sky:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0284c7 !important;
+}
+
+.card-3d-cream {
+  background-color: #faf8f5 !important;
+  border: 2px solid #d97706 !important;
+  box-shadow: 4px 4px 0px 0px #d97706 !important;
+  border-radius: 16px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.card-3d-cream:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #d97706 !important;
+}
+
+.card-3d-mint {
+  background-color: #f2fbf7 !important;
+  border: 2px solid #059669 !important;
+  box-shadow: 4px 4px 0px 0px #059669 !important;
+  border-radius: 16px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.card-3d-mint:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #059669 !important;
+}
+
+.card-3d-lavender {
+  background-color: #f6f5ff !important;
+  border: 2px solid #6d28d9 !important;
+  box-shadow: 4px 4px 0px 0px #6d28d9 !important;
+  border-radius: 16px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.card-3d-lavender:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #6d28d9 !important;
+}
+
+/* 3. Fully Interactive 3D Physics Buttons (Sinks on Click) */
+.btn-3d-cyan {
+  background: #22d3ee !important;
+  color: #083344 !important;
+  border: 2px solid #083344 !important;
+  box-shadow: 4px 4px 0px 0px #083344 !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-cyan:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #083344 !important;
+  background: #06b6d4 !important;
+}
+.btn-3d-cyan:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #083344 !important;
+}
+
+.btn-3d-sky {
+  background: #38bdf8 !important;
+  color: #0f172a !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 4px 4px 0px 0px #0f172a !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-sky:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0f172a !important;
+  background: #0ea5e9 !important;
+}
+.btn-3d-sky:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #0f172a !important;
+}
+
+.btn-3d-indigo {
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 4px 4px 0px 0px #0f172a !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-indigo:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0f172a !important;
+  background: #4f46e5 !important;
+}
+.btn-3d-indigo:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #0f172a !important;
+}
+
+.btn-3d-slate {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 4px 4px 0px 0px #0f172a !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-slate:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #0f172a !important;
+  background: #f1f5f9 !important;
+}
+.btn-3d-slate:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #0f172a !important;
+}
+
+.btn-3d-amber {
+  background: #fbbf24 !important;
+  color: #78350f !important;
+  border: 2px solid #78350f !important;
+  box-shadow: 4px 4px 0px 0px #78350f !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-amber:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #78350f !important;
+  background: #f59e0b !important;
+}
+.btn-3d-amber:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #78350f !important;
+}
+
+.btn-3d-rose {
+  background: #fb7185 !important;
+  color: #4c0519 !important;
+  border: 2px solid #4c0519 !important;
+  box-shadow: 4px 4px 0px 0px #4c0519 !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-rose:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #4c0519 !important;
+  background: #f43f5e !important;
+}
+.btn-3d-rose:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #4c0519 !important;
+}
+
+.btn-3d-emerald {
+  background: #34d399 !important;
+  color: #064e3b !important;
+  border: 2px solid #064e3b !important;
+  box-shadow: 4px 4px 0px 0px #064e3b !important;
+  font-weight: 800 !important;
+  transition: all 0.1s ease-in-out !important;
+}
+.btn-3d-emerald:hover:not(:disabled) {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #064e3b !important;
+  background: #10b981 !important;
+}
+.btn-3d-emerald:active:not(:disabled) {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px #064e3b !important;
+}
+
+/* 4. High-Contrast Inputs and Form Fields */
+.input-3d {
+  background-color: #ffffff !important;
+  border: 2px solid #0f172a !important;
+  box-shadow: 2px 2px 0px 0px #0f172a !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease-in-out !important;
+}
+.input-3d:focus {
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 4px 4px 0px 0px #0284c7 !important;
+  border-color: #0284c7 !important;
+}
+
+/* 5. Sharp and High Contrast Labels */
+.text-high-contrast {
+  color: #0f172a !important;
+}
+.text-high-contrast-muted {
+  color: #334155 !important;
+}
+.text-high-contrast-bold {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+/* 6. Tactile 3D Badges */
+.badge-3d-slate {
+  background-color: #f1f5f9 !important;
+  border: 1.5px solid #0f172a !important;
+  box-shadow: 2px 2px 0px 0px #0f172a !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+.badge-3d-sky {
+  background-color: #e0f2fe !important;
+  border: 1.5px solid #0369a1 !important;
+  box-shadow: 2px 2px 0px 0px #0369a1 !important;
+  color: #0369a1 !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+.badge-3d-amber {
+  background-color: #fef3c7 !important;
+  border: 1.5px solid #b45309 !important;
+  box-shadow: 2px 2px 0px 0px #b45309 !important;
+  color: #b45309 !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+.badge-3d-emerald {
+  background-color: #d1fae5 !important;
+  border: 1.5px solid #047857 !important;
+  box-shadow: 2px 2px 0px 0px #047857 !important;
+  color: #047857 !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+.badge-3d-purple {
+  background-color: #f3e8ff !important;
+  border: 1.5px solid #6d28d9 !important;
+  box-shadow: 2px 2px 0px 0px #6d28d9 !important;
+  color: #6d28d9 !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+.badge-3d-rose {
+  background-color: #ffe4e6 !important;
+  border: 1.5px solid #be123c !important;
+  box-shadow: 2px 2px 0px 0px #be123c !important;
+  color: #be123c !important;
+  font-weight: 800 !important;
+  font-family: var(--font-mono) !important;
+}
+
