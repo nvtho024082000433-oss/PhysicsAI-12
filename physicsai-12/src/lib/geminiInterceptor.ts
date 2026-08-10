@@ -1,4 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import {
+  getLocalPhysicsResponse,
+  getLocalExamResponse,
+  getLocalAnalyzeExamResponse,
+  getLocalSummarizeResponse,
+  getLocalParseExerciseResponse
+} from "./localPhysicsBot";
 
 const originalFetch = window.fetch;
 
@@ -390,10 +397,44 @@ Hãy xuất bản tóm tắt bài học dưới dạng JSON gồm:
   throw new Error(`Endpoint không được hỗ trợ dự phòng trên máy khách: ${url}`);
 }
 
+function getLocalFallbackData(url: string, bodyObj: any): any {
+  if (url.includes("/api/gemini/chat")) {
+    const { message, mode } = bodyObj || {};
+    return getLocalPhysicsResponse(message || "", mode || "general");
+  }
+  if (url.includes("/api/gemini/create-exam")) {
+    const { chapters, ratio, part1, part2, part3 } = bodyObj || {};
+    const p1 = part1 || { count: 4, points: 4.0 };
+    const p2 = part2 || { count: 2, points: 4.0 };
+    const p3 = part3 || { count: 2, points: 2.0 };
+    return getLocalExamResponse(chapters || [], ratio, p1, p2, p3);
+  }
+  if (url.includes("/api/gemini/analyze-exam")) {
+    const { studentAnswers, examQuestions } = bodyObj || {};
+    return getLocalAnalyzeExamResponse(studentAnswers || [], examQuestions || []);
+  }
+  if (url.includes("/api/gemini/summarize-lesson")) {
+    const { title, content } = bodyObj || {};
+    return getLocalSummarizeResponse(title || "", content || "");
+  }
+  if (url.includes("/api/gemini/parse-uploaded-exercise")) {
+    const { fileName, textContent } = bodyObj || {};
+    return getLocalParseExerciseResponse(fileName || "", textContent || "");
+  }
+  return { error: "Không hỗ trợ yêu cầu này ngoại tuyến." };
+}
+
 const customFetch = async function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const urlStr = typeof input === "string" ? input : (input instanceof URL ? input.href : input.url);
   
   if (urlStr.includes("/api/gemini/")) {
+    let bodyObj: any = {};
+    if (init && init.body) {
+      try {
+        bodyObj = JSON.parse(init.body as string);
+      } catch (_) {}
+    }
+
     try {
       const response = await originalFetch(input, init);
       
@@ -412,34 +453,31 @@ const customFetch = async function(input: RequestInfo | URL, init?: RequestInit)
 
         if (isServerError || isInvocationFailed) {
           console.warn(`[Vercel Fallback Interceptor] Backend returned ${response.status}. Attempting direct client-side Gemini call...`);
-          let bodyObj: any = {};
-          if (init && init.body) {
-            try {
-              bodyObj = JSON.parse(init.body as string);
-            } catch (_) {}
+          try {
+            const result = await runClientSideGemini(urlStr, bodyObj);
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "X-Direct-Client-Fallback": "true"
+              }
+            });
+          } catch (fallbackError: any) {
+            console.warn(`[Vercel Fallback Interceptor] Client-side Gemini failed: ${fallbackError.message}. Triggering offline local database...`);
+            const fallbackResult = getLocalFallbackData(urlStr, bodyObj);
+            return new Response(JSON.stringify(fallbackResult), {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "X-Local-Offline-Fallback": "true"
+              }
+            });
           }
-          
-          const result = await runClientSideGemini(urlStr, bodyObj);
-          
-          return new Response(JSON.stringify(result), {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "X-Direct-Client-Fallback": "true"
-            }
-          });
         }
       }
       return response;
     } catch (networkError: any) {
       console.warn(`[Vercel Fallback Interceptor] Network error detected: ${networkError.message}. Triggering client-side fallback...`);
-      let bodyObj: any = {};
-      if (init && init.body) {
-        try {
-          bodyObj = JSON.parse(init.body as string);
-        } catch (_) {}
-      }
-      
       try {
         const result = await runClientSideGemini(urlStr, bodyObj);
         return new Response(JSON.stringify(result), {
@@ -450,9 +488,14 @@ const customFetch = async function(input: RequestInfo | URL, init?: RequestInit)
           }
         });
       } catch (fallbackError: any) {
-        return new Response(JSON.stringify({ error: `Cả hai kết nối (Backend & Client Fallback) đều thất bại. Chi tiết lỗi dự phòng: ${fallbackError.message}` }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" }
+        console.warn(`[Vercel Fallback Interceptor] Client-side Gemini failed: ${fallbackError.message}. Triggering offline local database...`);
+        const fallbackResult = getLocalFallbackData(urlStr, bodyObj);
+        return new Response(JSON.stringify(fallbackResult), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Local-Offline-Fallback": "true"
+          }
         });
       }
     }
