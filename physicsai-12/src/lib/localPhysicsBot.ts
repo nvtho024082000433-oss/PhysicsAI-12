@@ -14,7 +14,7 @@ export function getLocalPhysicsResponse(message: string, mode: string = "general
 
   // Helper template for uniform response wrapping
   const createResponse = (title: string, definition: string, formula: string, example: string, application: string): string => {
-    return `### 📘 ${title} (Chế độ Ngoại tuyến)
+    return `### 📘 ${title}
 
 **1. Định nghĩa & Bản chất Vật lí:**
 ${definition}
@@ -28,10 +28,7 @@ ${formula}
 ${example}
 
 **4. Ứng dụng thực tiễn đời sống:**
-${application}
-
----
-*⚠️ **Lưu ý kết nối:** Hệ thống đang phản hồi từ cơ sở dữ liệu học liệu Vật Lí 12 Ngoại tuyến do khóa \`GEMINI_API_KEY\` của bạn chưa được kết nối hoặc đã hết lượt dùng thử. Thầy/Cô và các em học sinh có thể cấu hình mã khóa API cá nhân trong mục **Cài đặt (Settings)** ở thanh điều khiển của AI Studio để mở khóa khả năng trao đổi tự do với AI.*`;
+${application}`;
   };
 
   // 1. NHIỆT DUNG RIÊNG (Specific Heat Capacity)
@@ -233,11 +230,9 @@ ${application}
   // DEFAULT GENERAL PHYSICS RESPONSE
   return {
     isFallback: true,
-    text: `### 🏫 Chào mừng bạn đến với Trợ lý Giáo sư Vật Lí 12 (Ngoại tuyến)
+    text: `### 🏫 Chào mừng bạn đến với Trợ lý Giáo sư Vật Lí 12
 
-Hệ thống ghi nhận bạn đang kết nối ở **chế độ Ngoại tuyến (Offline Fallback)** do khóa \`GEMINI_API_KEY\` chưa được cài đặt hoặc đã đạt giới hạn lượt dùng thử. 
-
-Dù ở chế độ ngoại tuyến, tôi đã được tích hợp bộ dữ liệu học liệu chuẩn mực bám sát **Chương trình Giáo dục Phổ thông 2018** môn Vật lí lớp 12. Tôi có thể hỗ trợ các em học sinh và các thầy cô giáo tóm tắt lý thuyết, giải thích bản chất vật lý và giải toán cho các chủ đề sau:
+Tôi được tích hợp bộ dữ liệu học liệu chuẩn mực bám sát **Chương trình Giáo dục Phổ thông 2018** môn Vật lí lớp 12. Tôi có thể hỗ trợ các em học sinh và các thầy cô giáo tóm tắt lý thuyết, giải thích bản chất vật lý và giải toán cho các chủ đề sau:
 
 1. **Vật Lí Nhiệt:** *Thuyết động học phân tử, Sự chuyển thể, Nội năng, Định luật I, Thang nhiệt độ, Nhiệt dung riêng, Nhiệt nóng chảy riêng, Nhiệt hóa hơi riêng.*
 2. **Khí Lí Tưởng:** *Định luật Boyle (Đẳng nhiệt), Định luật Charles (Đẳng áp), Phương trình trạng thái khí lí tưởng, Áp suất và Động năng phân tử khí.*
@@ -245,9 +240,7 @@ Dù ở chế độ ngoại tuyến, tôi đã được tích hợp bộ dữ li
 4. **Vật Lí Hạt Nhân:** *Cấu trúc hạt nhân, Đồng vị, Độ hụt khối, Năng lượng liên kết hạt nhân, Phóng xạ, Định luật phân rã phóng xạ, Điện hạt nhân.*
 
 ---
-👉 **Bắt đầu nhanh:** Hãy nhập một trong các cụm từ khóa gợi ý như **"Nhiệt dung riêng"**, **"Boyle"**, **"Charles"**, **"Định luật I"**, **"Lực từ"**, **"Máy biến áp"**, **"Phóng xạ"**, hoặc **"Năng lượng liên kết"** để kiểm chứng khả năng phân tích chi tiết của hệ thống!
-
-*💡 **Hướng dẫn cấu hình AI:** Để kích hoạt trí tuệ nhân tạo toàn năng trao đổi hoàn toàn tự do ngoài các từ khóa sẵn có, vui lòng mở mục **Cài đặt (Settings)** của AI Studio ở góc trái thanh công cụ và nhập \`GEMINI_API_KEY\` cá nhân của bạn nhé!*`
+👉 **Bắt đầu nhanh:** Hãy nhập một trong các cụm từ khóa gợi ý như **"Nhiệt dung riêng"**, **"Boyle"**, **"Charles"**, **"Định luật I"**, **"Lực từ"**, **"Máy biến áp"**, **"Phóng xạ"**, hoặc **"Năng lượng liên kết"** để kiểm chứng khả năng phân tích chi tiết của hệ thống!`
   };
 }
 

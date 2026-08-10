@@ -1,5 +1,21 @@
 {
   "entities": {
+    "students": {
+      "title": "Student Info",
+      "description": "Student login and general credentials info",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "class": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "hoTen": { "type": "string" },
+        "lop": { "type": "string" },
+        "maHocSinh": { "type": "string" },
+        "thoiGianDangNhapCuoi": { "type": "string" }
+      },
+      "required": ["name", "class", "studentCode", "lastLoginAt"]
+    },
     "student_results": {
       "title": "Student Result",
       "description": "Learning results for a student",
@@ -43,6 +59,10 @@
     }
   },
   "firestore": {
+    "/students/{studentId}": {
+      "schema": "students",
+      "description": "Student login and general credentials info"
+    },
     "/student_results/{docId}": {
       "schema": "student_results",
       "description": "Student academic results"

@@ -676,6 +676,7 @@ app.post("/api/backup/activities/clear", (req, res) => {
 // 1. API: AI TRỢ GIẢNG (CHATBOT)
 // ==========================================
 app.post("/api/gemini/chat", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   try {
     const { message, history, mode } = req.body;
     
@@ -898,9 +899,10 @@ app.post("/api/gemini/chat", async (req, res) => {
     const contents = [];
     if (history && Array.isArray(history)) {
       for (const h of history) {
+        const textVal = h.content || h.message || h.text || (h.parts && h.parts[0]?.text) || "";
         contents.push({
           role: h.role === "user" ? "user" : "model",
-          parts: [{ text: h.content }]
+          parts: [{ text: textVal }]
         });
       }
     }
@@ -914,7 +916,7 @@ app.post("/api/gemini/chat", async (req, res) => {
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents,
         config: {
           systemInstruction,
@@ -924,12 +926,9 @@ app.post("/api/gemini/chat", async (req, res) => {
 
       res.json({ text: response.text });
     } catch (apiError: any) {
-      const cleanMsg = cleanErrorMessage(apiError.message || "");
       console.warn("⚠️ [Gemini API] Lấy phản hồi thất bại (Khóa API có thể đã hết hạn hoặc bị đình chỉ). Đã tự động chuyển sang học liệu Vật lý 12 Ngoại tuyến.");
       const fallback = getLocalPhysicsResponse(message, mode);
-      let text = fallback.text;
-      text += `\n\n*(Thông báo từ hệ thống: Trợ lý đã chuyển sang cơ sở dữ liệu học liệu ngoại tuyến do sự cố kết nối API: [${cleanMsg}])*`;
-      res.json({ text, isFallback: true });
+      res.json({ text: fallback.text, isFallback: true });
     }
   } catch (error: any) {
     console.error("Chat error:", error);
@@ -941,6 +940,7 @@ app.post("/api/gemini/chat", async (req, res) => {
 // 2. API: TẠO ĐỀ KIỂM TRA (AI EXAM CREATOR)
 // ==========================================
 app.post("/api/gemini/create-exam", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   const { chapters = [], time = 45, ratio = { nb: 40, th: 30, vd: 20, vdc: 10 }, part1, part2, part3 } = req.body || {};
   const p1 = part1 || { count: 4, points: 4.0 };
   const p2 = part2 || { count: 2, points: 4.0 };
@@ -1044,7 +1044,7 @@ Yêu cầu trả về cấu trúc JSON chính xác theo schema sau:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1146,6 +1146,7 @@ Yêu cầu trả về cấu trúc JSON chính xác theo schema sau:
 // 3. API: PHÂN TÍCH ĐỀ KIỂM TRA (AI EXAM ANALYZER)
 // ==========================================
 app.post("/api/gemini/analyze-exam", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   const { fileData, fileName, fileType, rawText } = req.body || {};
   try {
     if (!process.env.GEMINI_API_KEY) {
@@ -1190,7 +1191,7 @@ app.post("/api/gemini/analyze-exam", async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents,
       config: {
         systemInstruction,
@@ -1268,6 +1269,7 @@ app.post("/api/gemini/analyze-exam", async (req, res) => {
 // 4. API: TÓM TẮT & GIẢI THÍCH BÀI HỌC (LESSON COGNITION)
 // ==========================================
 app.post("/api/gemini/summarize-lesson", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   const { title, content } = req.body || {};
   try {
     if (!process.env.GEMINI_API_KEY) {
@@ -1284,7 +1286,7 @@ app.post("/api/gemini/summarize-lesson", async (req, res) => {
     5. Bộ 3 câu hỏi trắc nghiệm nhanh (Quiz) ôn luyện có đáp án và giải thích ngắn.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1342,6 +1344,7 @@ app.post("/api/gemini/summarize-lesson", async (req, res) => {
 // 5. API: AI ĐỌC TÀI LIỆU / ẢNH BÀI TẬP VÀ ĐƯA VÀO NGÂN HÀNG CÂU HỎI
 // ==========================================
 app.post("/api/gemini/parse-uploaded-exercise", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   const { fileData, fileType, fileName } = req.body || {};
   let textContent = "";
   if (!fileData) {
@@ -1434,7 +1437,7 @@ app.post("/api/gemini/parse-uploaded-exercise", async (req, res) => {
       "Hãy đảm bảo tất cả các câu hỏi trích xuất đều có nội dung chính xác, công thức rõ ràng, và đáp án khoa học.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents,
       config: {
         systemInstruction,

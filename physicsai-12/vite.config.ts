@@ -11,6 +11,9 @@ export default defineConfig(() => {
   return {
     root: path.resolve(__dirname, '.'),
     plugins: [react(), tailwindcss()],
+    define: {
+      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
+    },
     build: {
       outDir: path.resolve(__dirname, 'dist'),
       emptyOutDir: true,
