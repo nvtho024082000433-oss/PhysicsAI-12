@@ -273,11 +273,29 @@ export function AIAssistant({ onEarnXP }: { onEarnXP: (xp: number) => void }) {
           }),
         });
 
-        data = await response.json();
-        if (response.ok && data.text) {
-          success = true;
+        const contentType = response.headers.get("content-type");
+        if (!response.ok) {
+          let errMsg = `HTTP error! status: ${response.status}`;
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errMsg = errData.error || errData.message || errMsg;
+          } else {
+            const errText = await response.text();
+            errMsg = errText.substring(0, 200) || errMsg;
+          }
+          throw new Error(errMsg);
+        }
+
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+          if (data && data.text) {
+            success = true;
+          } else {
+            throw new Error((data && data.error) || "Không nhận được phản hồi hợp lệ từ AI");
+          }
         } else {
-          throw new Error(data.error || `HTTP error! status: ${response.status}`);
+          const rawText = await response.text();
+          throw new Error(`Đầu ra không đúng định dạng JSON: ${rawText.substring(0, 100)}...`);
         }
       } catch (err: any) {
         console.warn(`Retry attempt ${attempt} failed:`, err);

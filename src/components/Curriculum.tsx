@@ -32,7 +32,7 @@ import {
   Waves,
   Radio
 } from "lucide-react";
-import { Chapter, Lesson, ACADEMIC_CHAPTERS } from "../types";
+import { Chapter, Lesson, ACADEMIC_CHAPTERS, StudentResult } from "../types";
 import {
   INITIAL_P1_QUESTIONS,
   INITIAL_P2_QUESTIONS,
@@ -2100,15 +2100,19 @@ export function Curriculum({
   onResetInitialLesson,
   loggedInUser,
   isFocusMode = false,
-  setIsFocusMode = () => {}
+  setIsFocusMode = () => {},
+  studentResults,
+  onUpdateResults
 }: {
-  onEarnXP: (xp: number) => void;
+  onEarnXP: (xp: number, quizScore?: number, forceProgress?: number) => void;
   userRole?: "student" | "teacher";
   initialLessonId?: string | null;
   onResetInitialLesson?: () => void;
   loggedInUser?: { name: string; className: string; role: "student" | "teacher" } | null;
   isFocusMode?: boolean;
   setIsFocusMode?: (val: boolean) => void;
+  studentResults?: StudentResult[];
+  onUpdateResults?: (results: StudentResult[]) => void;
 }) {
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -2611,7 +2615,7 @@ export function Curriculum({
       p3: parseFloat(scoreP3.toFixed(2))
     });
     setExamSubmitted(true);
-    onEarnXP(Math.round(finalScore * 12));
+    onEarnXP(Math.round(finalScore * 12), finalScore);
 
     // Save test score to localStorage for AI recommendation feedback loop
     if (loggedInUser && selectedLesson) {

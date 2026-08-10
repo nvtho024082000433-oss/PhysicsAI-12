@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "student_results": {
+      "title": "Student Result",
+      "description": "Learning results for a student",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "className": { "type": "string" },
+        "score": { "type": "number" },
+        "progress": { "type": "number" },
+        "completedQuizzes": { "type": "number" },
+        "xp": { "type": "number" },
+        "hoVaTen": { "type": "string" },
+        "lop": { "type": "string" },
+        "diemHocTap": { "type": "number" },
+        "tienDo": { "type": "number" },
+        "tichLuyXP": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "className", "score", "progress", "xp"]
+    },
+    "student_activities": {
+      "title": "Student Activity",
+      "description": "Log of a student activity (quiz, lab completion, etc.)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentName": { "type": "string" },
+        "className": { "type": "string" },
+        "activityType": { "type": "string" },
+        "description": { "type": "string" },
+        "xpGained": { "type": "number" },
+        "timestamp": { "type": "string" },
+        "hoVaTen": { "type": "string" },
+        "lop": { "type": "string" },
+        "loaiHoatDong": { "type": "string" },
+        "moTa": { "type": "string" },
+        "xpNhanDuoc": { "type": "number" },
+        "thoiGian": { "type": "string" }
+      },
+      "required": ["id", "studentName", "className", "activityType", "description", "xpGained", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/student_results/{docId}": {
+      "schema": "student_results",
+      "description": "Student academic results"
+    },
+    "/student_activities/{activityId}": {
+      "schema": "student_activities",
+      "description": "Student activity logs"
+    }
+  }
+}

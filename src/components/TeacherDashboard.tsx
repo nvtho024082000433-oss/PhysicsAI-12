@@ -20,9 +20,18 @@ import {
   Unlink,
   RefreshCw,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Database,
+  Clock,
+  BookOpen,
+  ClipboardCheck,
+  FlaskConical,
+  MessageSquare,
+  HelpCircle,
+  FileText
 } from "lucide-react";
 import { initAuth, googleSignIn, getAccessToken } from "../lib/googleDriveAuth";
+import { saveGoogleSheetsConfig, removeGoogleSheetsConfig, listenToGoogleSheetsConfig } from "../lib/firestoreDb";
 import {
   BarChart,
   Bar,
@@ -32,16 +41,33 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from "recharts";
-import { StudentResult, DEFAULT_STUDENT_RESULTS } from "../types";
+import { StudentResult, DEFAULT_STUDENT_RESULTS, StudentActivity } from "../types";
 
 interface TeacherDashboardProps {
   studentResults: StudentResult[];
+  studentActivities?: StudentActivity[];
   onUpdateResults: (results: StudentResult[]) => void;
+  onClearActivities?: () => void;
 }
 
-export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDashboardProps) {
+export function TeacherDashboard({ 
+  studentResults, 
+  studentActivities = [], 
+  onUpdateResults,
+  onClearActivities
+}: TeacherDashboardProps) {
+  const [dashboardSubTab, setDashboardSubTab] = useState<"list" | "activities" | "detailed_grades">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClass, setSelectedClass] = useState<string>("All");
+  const [expandedStudentKey, setExpandedStudentKey] = useState<string | null>(null);
+
+  const parseQuizScore = (description: string): string => {
+    const match = description.match(/Điểm:\s*([0-9.]+)\/10/i) || description.match(/Điểm:\s*([0-9.]+)/i);
+    if (match) {
+      return `${match[1]}/10`;
+    }
+    return "-";
+  };
 
   // Custom confirmation modal states
   const [studentToDelete, setStudentToDelete] = useState<StudentResult | null>(null);
@@ -57,6 +83,157 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
   const [syncStatusMsg, setSyncStatusMsg] = useState("");
   const [errorMsgSheet, setErrorMsgSheet] = useState("");
   const [manualSheetInput, setManualSheetInput] = useState("");
+
+  // Supabase Integration states
+  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
+  const [supabaseTableExists, setSupabaseTableExists] = useState(false);
+  const [supabaseTableName, setSupabaseTableName] = useState("student_results");
+  const [supabaseProjectRef, setSupabaseProjectRef] = useState("guajmfmzkseypwwzcrck");
+  const [supabaseSyncing, setSupabaseSyncing] = useState(false);
+  const [supabaseStatusMsg, setSupabaseStatusMsg] = useState("");
+  const [supabaseError, setSupabaseError] = useState("");
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [showSqlHelp, setShowSqlHelp] = useState(false);
+
+  // Fetch Supabase configuration and status on mount
+  useEffect(() => {
+    const fetchSupabaseStatus = async () => {
+      try {
+        const res = await fetch("/api/supabase/status");
+        if (res.ok) {
+          const data = await res.json();
+          setSupabaseConfigured(data.configured);
+          setSupabaseTableExists(data.tableExists);
+          if (data.tableName) {
+            setSupabaseTableName(data.tableName);
+          }
+          if (data.projectRef) {
+            setSupabaseProjectRef(data.projectRef);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch Supabase status:", err);
+      }
+    };
+    fetchSupabaseStatus();
+  }, []);
+
+  const handleSyncToSupabase = async () => {
+    setSupabaseSyncing(true);
+    setSupabaseStatusMsg("Đang kết nối và đồng bộ dữ liệu lên Supabase...");
+    setSupabaseError("");
+    try {
+      const res = await fetch("/api/supabase/results/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ students: studentResults })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSupabaseTableExists(true);
+        setSupabaseStatusMsg(`✨ Đã đồng bộ thành công ${data.count} kết quả học sinh lên Supabase!`);
+        setTimeout(() => setSupabaseStatusMsg(""), 4000);
+      } else {
+        throw new Error(data.error || "Gặp lỗi khi đồng bộ lên Supabase.");
+      }
+    } catch (err: any) {
+      setSupabaseError(err.message || "Không thể đồng bộ dữ liệu lên Supabase.");
+      setSupabaseStatusMsg("");
+    } finally {
+      setSupabaseSyncing(false);
+    }
+  };
+
+  const handlePullFromSupabase = async () => {
+    setSupabaseSyncing(true);
+    setSupabaseStatusMsg("Đang tải dữ liệu điểm số mới nhất từ Supabase...");
+    setSupabaseError("");
+    try {
+      const res = await fetch("/api/supabase/results");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          onUpdateResults(data);
+          setSupabaseTableExists(true);
+          setSupabaseStatusMsg(`✨ Đã tải thành công ${data.length} kết quả từ Supabase và cập nhật hệ thống!`);
+          setTimeout(() => setSupabaseStatusMsg(""), 4000);
+        } else {
+          setSupabaseStatusMsg("Bảng điểm trên Supabase hiện đang trống hoặc chưa có dữ liệu.");
+          setTimeout(() => setSupabaseStatusMsg(""), 3000);
+        }
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || "Không thể tải dữ liệu.");
+      }
+    } catch (err: any) {
+      setSupabaseError(err.message || "Gặp lỗi trong quá trình tải dữ liệu từ Supabase.");
+      setSupabaseStatusMsg("");
+    } finally {
+      setSupabaseSyncing(false);
+    }
+  };
+
+  const currentTableName = supabaseTableName || "student_results";
+  const isVietnameseTable = currentTableName.startsWith("ket_qua_hoc_tap");
+  
+  const sqlScript = isVietnameseTable 
+    ? `-- Dành cho bảng tiếng Việt '${currentTableName}'
+CREATE TABLE IF NOT EXISTS public."${currentTableName}" (
+    id TEXT PRIMARY KEY,
+    "Họ và tên" TEXT NOT NULL,
+    "Lớp" TEXT NOT NULL,
+    "Điểm học tập (GPA)" NUMERIC DEFAULT 0,
+    "Tiến độ học (%)" NUMERIC DEFAULT 0,
+    "Số câu trắc nghiệm đúng" INTEGER DEFAULT 0,
+    "Tích lũy XP" INTEGER DEFAULT 0,
+    "Cập nhật" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Kích hoạt tính năng Row Level Security (RLS) để bảo mật dữ liệu
+ALTER TABLE public."${currentTableName}" ENABLE ROW LEVEL SECURITY;
+
+-- Tạo các chính sách (Policies) để cho phép đọc/ghi tự do bằng Anon Key (Publishable Key)
+CREATE POLICY "Allow public select" ON public."${currentTableName}" FOR SELECT USING (true);
+CREATE POLICY "Allow public insert" ON public."${currentTableName}" FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update" ON public."${currentTableName}" FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete" ON public."${currentTableName}" FOR DELETE USING (true);`
+    : `CREATE TABLE IF NOT EXISTS public."${currentTableName}" (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    class_name TEXT NOT NULL,
+    score NUMERIC DEFAULT 0,
+    progress NUMERIC DEFAULT 0,
+    completed_quizzes INTEGER DEFAULT 0,
+    xp INTEGER DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public."${currentTableName}" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access" ON public."${currentTableName}" FOR SELECT USING (true);
+CREATE POLICY "Allow public insert" ON public."${currentTableName}" FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update" ON public."${currentTableName}" FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete" ON public."${currentTableName}" FOR DELETE USING (true);`;
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(sqlScript);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  // Listen to Google Sheets config changes from Firestore
+  useEffect(() => {
+    const unsubscribe = listenToGoogleSheetsConfig((config) => {
+      if (config) {
+        setSheetId(config.sheetId);
+        setSheetUrl(config.sheetUrl);
+      } else {
+        setSheetId(null);
+        setSheetUrl(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Hook up auth state listener
   useEffect(() => {
@@ -104,8 +281,7 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
         const mockUrl = "#sandbox-sheets";
         setSheetId(mockId);
         setSheetUrl(mockUrl);
-        localStorage.setItem("google_sheets_id", mockId);
-        localStorage.setItem("google_sheets_url", mockUrl);
+        saveGoogleSheetsConfig(mockId, mockUrl);
         setSyncStatusMsg("Đã tạo bảng tính giả lập thành công trên Sandbox!");
         setSyncingSheet(false);
         setTimeout(() => setSyncStatusMsg(""), 3000);
@@ -139,8 +315,7 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
 
       setSheetId(newSheetId);
       setSheetUrl(newSheetUrl);
-      localStorage.setItem("google_sheets_id", newSheetId);
-      localStorage.setItem("google_sheets_url", newSheetUrl);
+      saveGoogleSheetsConfig(newSheetId, newSheetUrl);
 
       setSyncStatusMsg("Đang đồng bộ dữ liệu...");
       await syncDataToSheet(newSheetId, googleToken);
@@ -169,8 +344,7 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
 
     setSheetId(extractedId);
     setSheetUrl(linkedUrl);
-    localStorage.setItem("google_sheets_id", extractedId);
-    localStorage.setItem("google_sheets_url", linkedUrl);
+    saveGoogleSheetsConfig(extractedId, linkedUrl);
     setManualSheetInput("");
     setSyncStatusMsg("Đã liên kết bảng tính thành công!");
     setTimeout(() => setSyncStatusMsg(""), 3000);
@@ -247,8 +421,7 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
     if (window.confirm("Bạn có chắc muốn hủy liên kết Bảng tính hiện tại không? Dữ liệu trên Google Sheet vẫn sẽ được giữ nguyên.")) {
       setSheetId(null);
       setSheetUrl(null);
-      localStorage.removeItem("google_sheets_id");
-      localStorage.removeItem("google_sheets_url");
+      removeGoogleSheetsConfig();
       setSyncStatusMsg("Đã hủy liên kết bảng tính.");
       setTimeout(() => setSyncStatusMsg(""), 3000);
     }
@@ -276,6 +449,9 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
 
   const handleConfirmReset = () => {
     saveResults(DEFAULT_STUDENT_RESULTS);
+    if (onClearActivities) {
+      onClearActivities();
+    }
     setShowResetConfirm(false);
   };
 
@@ -397,21 +573,93 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
   const handleExportCSV = () => {
     const BOM = "\uFEFF";
     let csvContent = BOM;
+
+    if (dashboardSubTab === "detailed_grades") {
+      csvContent += "Họ và tên,Lớp,Bài học / Hoạt động,Điểm số bài làm,Thời gian,Điểm trung bình (GPA)\n";
+      filteredActivities.forEach((act) => {
+        let scoreText = "-";
+        if (act.activityType === "quiz") {
+          scoreText = parseQuizScore(act.description);
+        } else if (act.activityType === "virtual_lab") {
+          scoreText = "Thí nghiệm";
+        } else {
+          scoreText = "Hoàn thành";
+        }
+
+        let formattedTime = "";
+        try {
+          const d = new Date(act.timestamp);
+          const hrs = d.getHours().toString().padStart(2, "0");
+          const mins = d.getMinutes().toString().padStart(2, "0");
+          const date = d.getDate().toString().padStart(2, "0");
+          const month = (d.getMonth() + 1).toString().padStart(2, "0");
+          const year = d.getFullYear();
+          formattedTime = `${hrs}:${mins} - ${date}/${month}/${year}`;
+        } catch (e) {
+          formattedTime = act.timestamp;
+        }
+
+        const studentRecord = studentResults.find(
+          (s) =>
+            s.name.trim().toLowerCase() === act.studentName.trim().toLowerCase() &&
+            s.className.trim().toUpperCase() === act.className.trim().toUpperCase()
+        );
+        const gpa = studentRecord ? studentRecord.score.toFixed(1) : "0.0";
+
+        csvContent += `"${act.studentName}","${act.className}","${act.description}","${scoreText}","${formattedTime}",${gpa}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fileName = selectedClass === "All"
+        ? "Bang_Diem_Chi_Tiet_Vat_Li_12_Tat_Ca.csv"
+        : `Bang_Diem_Chi_Tiet_Vat_Li_12_Lop_${selectedClass}.csv`;
+
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      csvContent += "Họ và tên,Lớp,Điểm học tập (GPA),Tiến độ học (%),Tích lũy XP,Số câu trắc nghiệm đúng\n";
+
+      filteredStudents.forEach((s) => {
+        csvContent += `"${s.name}","${s.className}",${s.score.toFixed(1)},${s.progress}%,${s.xp},${s.completedQuizzes}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fileName = selectedClass === "All"
+        ? "Ket_Qua_Hoc_Tap_Vat_Li_12_Tat_Ca.csv"
+        : `Ket_Qua_Hoc_Tap_Vat_Li_12_Lop_${selectedClass}.csv`;
+
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Export entire student results dataset from studentResults prop to CSV
+  const exportToCSV = () => {
+    const BOM = "\uFEFF";
+    let csvContent = BOM;
     csvContent += "Họ và tên,Lớp,Điểm học tập (GPA),Tiến độ học (%),Tích lũy XP,Số câu trắc nghiệm đúng\n";
 
-    filteredStudents.forEach((s) => {
+    studentResults.forEach((s) => {
       csvContent += `"${s.name}","${s.className}",${s.score.toFixed(1)},${s.progress}%,${s.xp},${s.completedQuizzes}\n`;
     });
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const fileName = selectedClass === "All"
-      ? "Ket_Qua_Hoc_Tap_Vat_Li_12_Tat_Ca.csv"
-      : `Ket_Qua_Hoc_Tap_Vat_Li_12_Lop_${selectedClass}.csv`;
-
     link.setAttribute("href", url);
-    link.setAttribute("download", fileName);
+    link.setAttribute("download", "Bao_Cao_Diem_So_Vat_Li_12_Toan_Bo.csv");
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -440,6 +688,33 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Lọc lịch sử hoạt động theo bộ lọc lớp và từ khóa tìm kiếm giống như danh sách học sinh
+  const filteredActivities = (studentActivities || []).filter((act) => {
+    if (selectedClass !== "All") {
+      const actClassNorm = act.className.trim().toUpperCase();
+      const selectedClassNorm = selectedClass.trim().toUpperCase();
+      if (actClassNorm !== selectedClassNorm && !actClassNorm.endsWith(selectedClassNorm)) {
+        return false;
+      }
+    }
+    if (searchTerm) {
+      const termNorm = searchTerm.trim().toLowerCase();
+      const studentNameNorm = act.studentName.trim().toLowerCase();
+      const descNorm = act.description.trim().toLowerCase();
+      return studentNameNorm.includes(termNorm) || descNorm.includes(termNorm);
+    }
+    return true;
+  });
+
+  // Lấy chi tiết lịch sử hoạt động/luyện tập của một học sinh cụ thể
+  const getStudentActivities = (name: string, className: string) => {
+    return (studentActivities || []).filter(
+      (act) =>
+        act.studentName.trim().toLowerCase() === name.trim().toLowerCase() &&
+        act.className.trim().toUpperCase() === className.trim().toUpperCase()
+    );
   };
 
   return (
@@ -512,21 +787,95 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
               />
             </div>
             <button
+              onClick={exportToCSV}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-[10px] transition-colors cursor-pointer shrink-0 border-none shadow-sm"
+              title="Xuất toàn bộ kết quả học sinh thành file CSV"
+            >
+              <FileSpreadsheet className="h-3 w-3" />
+              Xuất báo cáo
+            </button>
+            <button
               onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-[10px] transition-colors cursor-pointer shrink-0 border-none"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl text-[10px] transition-colors cursor-pointer shrink-0 border-none shadow-sm"
+              title="Xuất kết quả học sinh sau khi đã chọn bộ lọc lớp hoặc tìm kiếm"
             >
               <Download className="h-3 w-3" />
-              Xuất Excel
+              Xuất dữ liệu lọc
             </button>
             <button
               onClick={handleDownloadReport}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-xl text-[10px] transition-colors cursor-pointer shrink-0 border-none"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-xl text-[10px] transition-colors cursor-pointer shrink-0 border-none shadow-sm"
               title="Tải toàn bộ kết quả học sinh (JSON)"
             >
               <Download className="h-3 w-3" />
-              Tải Báo Cáo (JSON)
+              Báo cáo JSON
             </button>
           </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex justify-between items-end border-b border-slate-300 mb-4 shrink-0">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setDashboardSubTab("list")}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-t-0 border-l-0 border-r-0 border-b-2 cursor-pointer bg-transparent ${
+                dashboardSubTab === "list"
+                  ? "border-cyan-600 text-cyan-700 font-extrabold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                Danh sách học viên
+              </div>
+            </button>
+            <button
+              onClick={() => setDashboardSubTab("detailed_grades")}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-t-0 border-l-0 border-r-0 border-b-2 cursor-pointer bg-transparent ${
+                dashboardSubTab === "detailed_grades"
+                  ? "border-cyan-600 text-cyan-700 font-extrabold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Bảng kết quả luyện tập
+              </div>
+            </button>
+            <button
+              onClick={() => setDashboardSubTab("activities")}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-all border-t-0 border-l-0 border-r-0 border-b-2 cursor-pointer bg-transparent ${
+                dashboardSubTab === "activities"
+                  ? "border-cyan-600 text-cyan-700 font-extrabold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                Lịch sử hoạt động
+                {filteredActivities.length > 0 && (
+                  <span className="bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded-full text-[9px] font-black ml-1">
+                    {filteredActivities.length}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+
+          {(dashboardSubTab === "activities" || dashboardSubTab === "detailed_grades") && onClearActivities && (
+            <button
+              onClick={() => {
+                if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử luyện tập của học sinh? Hành động này sẽ không thể khôi phục.")) {
+                  onClearActivities();
+                }
+              }}
+              className="pb-2 text-xs font-black uppercase tracking-wider text-rose-600 hover:text-rose-800 flex items-center gap-1.5 border-none bg-transparent cursor-pointer transition-colors"
+              title="Xóa toàn bộ lịch sử luyện tập và lưu trữ"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Xóa lịch sử hoạt động
+            </button>
+          )}
         </div>
 
         {/* Filter buttons */}
@@ -549,61 +898,390 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
           ))}
         </div>
 
-        {/* Student list container */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="text-slate-950 border-b-2 border-slate-300 pb-2 font-black uppercase text-[10px] tracking-wider">
-                <th className="font-black pb-2 text-slate-950">Tên học sinh</th>
-                <th className="font-black pb-2 text-slate-950">Lớp</th>
-                <th className="font-black pb-2 text-slate-950">Tiến độ (%)</th>
-                <th className="font-black pb-2 text-center text-slate-950">Điểm GPA</th>
-                <th className="font-black pb-2 text-right text-slate-950">Tích lũy XP</th>
-                <th className="font-black pb-2 text-right text-slate-950">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-300">
-              {filteredStudents.length > 0 ? (
-                filteredStudents.map((student, idx) => (
-                  <tr key={idx} className="hover:bg-slate-100/60">
-                    <td className="py-2.5 font-bold text-slate-900">{student.name}</td>
-                    <td className="py-2.5 text-slate-900 font-mono font-bold">12{student.className.replace("12", "")}</td>
-                    <td className="py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-cyan-500" style={{ width: `${student.progress}%` }}></div>
-                        </div>
-                        <span className="text-[10.5px] text-slate-950 font-mono font-bold">{student.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 text-center font-mono font-extrabold text-amber-900">
-                      {student.score.toFixed(1)} / 10
-                    </td>
-                    <td className="py-2.5 text-right font-mono font-extrabold text-sky-900">
-                      {student.xp.toLocaleString()} XP
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <button
-                        onClick={() => handleDeleteStudentClick(student)}
-                        className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 border-2 border-red-400 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer inline-flex items-center gap-1 shadow-sm"
-                        title="Xoá học viên"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Xoá
-                      </button>
+        {dashboardSubTab === "list" ? (
+          /* Student list container */
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="text-slate-950 border-b-2 border-slate-300 pb-2 font-black uppercase text-[10px] tracking-wider">
+                  <th className="font-black pb-2 text-slate-950">Tên học sinh</th>
+                  <th className="font-black pb-2 text-slate-950">Lớp</th>
+                  <th className="font-black pb-2 text-slate-950">Tiến độ (%)</th>
+                  <th className="font-black pb-2 text-center text-slate-950">Điểm trung bình (GPA)</th>
+                  <th className="font-black pb-2 text-right text-slate-950">Tích lũy XP</th>
+                  <th className="font-black pb-2 text-slate-950 hidden md:table-cell">Ngày giờ làm bài (Mới nhất)</th>
+                  <th className="font-black pb-2 text-center text-slate-950 hidden md:table-cell">Điểm của từng bài</th>
+                  <th className="font-black pb-2 text-right text-slate-950">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-300">
+                {filteredStudents.length > 0 ? (
+                  filteredStudents.map((student, idx) => {
+                    const studentKey = `${student.name}_${student.className}`;
+                    const isExpanded = expandedStudentKey === studentKey;
+                    const studentIndividualActs = getStudentActivities(student.name, student.className);
+                    const latestAct = studentIndividualActs[0];
+
+                    const quizScores = studentIndividualActs
+                      .filter(act => act.activityType === "quiz")
+                      .map(act => parseQuizScore(act.description))
+                      .filter(score => score !== "-");
+
+                    let latestPracticeTime = "Chưa luyện tập";
+                    if (latestAct) {
+                      try {
+                        const d = new Date(latestAct.timestamp);
+                        const hrs = d.getHours().toString().padStart(2, "0");
+                        const mins = d.getMinutes().toString().padStart(2, "0");
+                        const date = d.getDate().toString().padStart(2, "0");
+                        const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                        latestPracticeTime = `${hrs}:${mins} - ${date}/${month}`;
+                      } catch (e) {
+                        latestPracticeTime = latestAct.timestamp;
+                      }
+                    }
+
+                    return (
+                      <React.Fragment key={studentKey}>
+                        <tr 
+                          onClick={() => setExpandedStudentKey(isExpanded ? null : studentKey)}
+                          className="hover:bg-slate-100/60 cursor-pointer transition-colors"
+                        >
+                          <td className="py-2.5 font-bold text-slate-900">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-slate-400">
+                                {isExpanded ? "▼" : "▶"}
+                              </span>
+                              {student.name}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-slate-900 font-mono font-bold">12{student.className.replace("12", "")}</td>
+                          <td className="py-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-16 bg-slate-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-cyan-500" style={{ width: `${student.progress}%` }}></div>
+                              </div>
+                              <span className="text-[10.5px] text-slate-950 font-mono font-bold">{student.progress}%</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-center font-mono font-extrabold text-amber-900">
+                            {student.score.toFixed(1)} / 10
+                          </td>
+                          <td className="py-2.5 text-right font-mono font-extrabold text-sky-900">
+                            {student.xp.toLocaleString()} XP
+                          </td>
+                          <td className="py-2.5 hidden md:table-cell font-medium text-slate-600">
+                            {latestPracticeTime}
+                          </td>
+                          <td className="py-2.5 text-center hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-wrap gap-1 justify-center max-w-[160px] mx-auto">
+                              {quizScores.length > 0 ? (
+                                quizScores.slice(0, 3).map((scoreVal, sIdx) => (
+                                  <span 
+                                    key={sIdx}
+                                    className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-black text-[9.5px]"
+                                    title="Điểm một bài luyện tập"
+                                  >
+                                    {scoreVal}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 italic text-[10px]">Chưa làm bài</span>
+                              )}
+                              {quizScores.length > 3 && (
+                                <span className="text-[9.5px] text-slate-500 font-extrabold ml-0.5">+{quizScores.length - 3}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleDeleteStudentClick(student)}
+                              className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-800 border-2 border-red-400 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                              title="Xoá học viên"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Xoá
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={8} className="p-4 bg-slate-50 border-t border-b border-slate-200">
+                              <div className="space-y-3 pl-4">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-black uppercase text-slate-900 flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-cyan-600" />
+                                    Chi tiết lịch sử luyện tập của {student.name} ({student.className})
+                                  </h4>
+                                  <span className="text-[10px] font-mono text-slate-500 font-bold bg-slate-200/70 px-2 py-0.5 rounded-full">
+                                    Tổng số: {studentIndividualActs.length} hoạt động
+                                  </span>
+                                </div>
+                                
+                                {studentIndividualActs.length > 0 ? (
+                                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm max-h-[300px] overflow-y-auto custom-scrollbar">
+                                    <table className="w-full text-left border-collapse text-[11px]">
+                                      <thead>
+                                        <tr className="bg-slate-100/80 text-slate-700 font-black uppercase text-[9px] tracking-wider border-b border-slate-200">
+                                          <th className="p-2 pl-3">Thời gian</th>
+                                          <th className="p-2">Bài luyện tập / Hoạt động</th>
+                                          <th className="p-2 text-center">Điểm luyện tập</th>
+                                          <th className="p-2 text-right pr-3">XP đạt được</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-150">
+                                        {studentIndividualActs.map((act) => {
+                                          let scoreText = "-";
+                                          if (act.activityType === "quiz") {
+                                            scoreText = parseQuizScore(act.description);
+                                          } else if (act.activityType === "virtual_lab") {
+                                            scoreText = "Thí nghiệm";
+                                          } else {
+                                            scoreText = "Hoàn thành";
+                                          }
+
+                                          let formattedTime = "";
+                                          try {
+                                            const d = new Date(act.timestamp);
+                                            const hrs = d.getHours().toString().padStart(2, "0");
+                                            const mins = d.getMinutes().toString().padStart(2, "0");
+                                            const date = d.getDate().toString().padStart(2, "0");
+                                            const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                                            const year = d.getFullYear();
+                                            formattedTime = `${hrs}:${mins} - ${date}/${month}/${year}`;
+                                          } catch (e) {
+                                            formattedTime = act.timestamp;
+                                          }
+
+                                          return (
+                                            <tr key={act.id} className="hover:bg-slate-50/50">
+                                              <td className="p-2 pl-3 font-mono text-slate-500">{formattedTime}</td>
+                                              <td className="p-2 text-slate-900 font-medium">{act.description}</td>
+                                              <td className="p-2 text-center">
+                                                <span className={`px-1.5 py-0.5 rounded font-bold text-[10.5px] ${
+                                                  act.activityType === "quiz"
+                                                    ? scoreText.includes("10") || scoreText.includes("9") || scoreText.includes("8")
+                                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                      : "bg-amber-50 text-amber-700 border border-amber-200"
+                                                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                                                }`}>
+                                                  {scoreText}
+                                                </span>
+                                              </td>
+                                              <td className="p-2 text-right pr-3 font-mono font-extrabold text-emerald-600">
+                                                +{act.xpGained} XP
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-6 bg-white border border-slate-200 rounded-xl">
+                                    <p className="text-[10.5px] text-slate-500 font-bold">Chưa có lịch sử luyện tập chi tiết cho học sinh này.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="text-center py-8 text-slate-800 font-mono font-bold">
+                      Không tìm thấy học sinh nào trong bộ lọc.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-800 font-mono font-bold">
-                    Không tìm thấy học sinh nào trong bộ lọc.
-                  </td>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : dashboardSubTab === "activities" ? (
+          /* Student Activity History Timeline */
+          <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
+            {filteredActivities.length > 0 ? (
+              <div className="relative pl-4 border-l-2 border-slate-300 ml-2.5 space-y-4 py-1.5">
+                {filteredActivities.map((act) => {
+                  let IconComponent = HelpCircle;
+                  let iconColor = "text-slate-600 bg-slate-100 border-slate-300";
+                  
+                  switch (act.activityType) {
+                    case "quiz":
+                      IconComponent = ClipboardCheck;
+                      iconColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                      break;
+                    case "virtual_lab":
+                      IconComponent = FlaskConical;
+                      iconColor = "text-purple-700 bg-purple-50 border-purple-200";
+                      break;
+                    case "ai_chat":
+                      IconComponent = MessageSquare;
+                      iconColor = "text-cyan-700 bg-cyan-50 border-cyan-200";
+                      break;
+                    case "glossary":
+                      IconComponent = BookOpen;
+                      iconColor = "text-sky-700 bg-sky-50 border-sky-200";
+                      break;
+                    case "formula_library":
+                      IconComponent = FileText;
+                      iconColor = "text-amber-700 bg-amber-50 border-amber-200";
+                      break;
+                    case "latex_sandbox":
+                      IconComponent = FileText;
+                      iconColor = "text-blue-700 bg-blue-50 border-blue-200";
+                      break;
+                    case "google_drive":
+                      IconComponent = FileSpreadsheet;
+                      iconColor = "text-green-700 bg-green-50 border-green-200";
+                      break;
+                    case "stem_zone":
+                      IconComponent = Sparkles;
+                      iconColor = "text-indigo-700 bg-indigo-50 border-indigo-200";
+                      break;
+                    default:
+                      IconComponent = BookOpen;
+                      iconColor = "text-slate-700 bg-slate-50 border-slate-200";
+                  }
+
+                  let formattedTime = "";
+                  try {
+                    const d = new Date(act.timestamp);
+                    const hrs = d.getHours().toString().padStart(2, "0");
+                    const mins = d.getMinutes().toString().padStart(2, "0");
+                    const date = d.getDate().toString().padStart(2, "0");
+                    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                    formattedTime = `${hrs}:${mins} - ${date}/${month}`;
+                  } catch (e) {
+                    formattedTime = act.timestamp;
+                  }
+
+                  return (
+                    <div key={act.id} className="relative group animate-fade-in">
+                      <span className="absolute -left-[24.5px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white border border-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400 group-hover:bg-cyan-600 transition-colors"></span>
+                      </span>
+
+                      <div className="bg-white hover:bg-slate-50/60 border-2 border-slate-200 hover:border-slate-300 rounded-xl p-3 shadow-sm transition-all flex items-start gap-3">
+                        <div className={`p-1.5 rounded-lg border flex items-center justify-center shrink-0 ${iconColor}`}>
+                          <IconComponent className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-black text-slate-900 truncate">
+                              {act.studentName}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-500 shrink-0 font-bold">
+                              {formattedTime}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[9px] bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded font-mono font-black shrink-0">
+                              12{act.className.replace("12", "")}
+                            </span>
+                            <span className="text-[10px] text-slate-600 font-medium truncate">
+                              {act.description}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] font-mono font-black text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md">
+                            +{act.xpGained} XP
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+                <Clock className="h-8 w-8 text-slate-300 mb-2 stroke-[1.5]" />
+                <p className="text-[11px] text-slate-500 font-bold">Chưa ghi nhận lịch sử hoạt động nào của học sinh trong nhóm lọc này.</p>
+                <p className="text-[9.5px] text-slate-400 mt-1">Các hoạt động làm bài kiểm tra, thực hành thí nghiệm ảo của học sinh sẽ tự động hiển thị tại đây.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Detailed Results Table */
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="text-slate-950 border-b-2 border-slate-300 pb-2 font-black uppercase text-[10px] tracking-wider">
+                  <th className="font-black pb-2 text-slate-950">Họ và tên</th>
+                  <th className="font-black pb-2 text-slate-950">Lớp</th>
+                  <th className="font-black pb-2 text-slate-950">Bài học / Hoạt động</th>
+                  <th className="font-black pb-2 text-center text-slate-950">Điểm số bài làm</th>
+                  <th className="font-black pb-2 text-slate-950 hidden md:table-cell">Thời gian</th>
+                  <th className="font-black pb-2 text-right text-slate-950">Điểm trung bình (GPA)</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-300">
+                {filteredActivities.length > 0 ? (
+                  filteredActivities.map((act) => {
+                    let scoreText = "-";
+                    if (act.activityType === "quiz") {
+                      scoreText = parseQuizScore(act.description);
+                    } else if (act.activityType === "virtual_lab") {
+                      scoreText = "Thí nghiệm";
+                    } else {
+                      scoreText = "Hoàn thành";
+                    }
+
+                    let formattedTime = "";
+                    try {
+                      const d = new Date(act.timestamp);
+                      const hrs = d.getHours().toString().padStart(2, "0");
+                      const mins = d.getMinutes().toString().padStart(2, "0");
+                      const date = d.getDate().toString().padStart(2, "0");
+                      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                      const year = d.getFullYear();
+                      formattedTime = `${hrs}:${mins} - ${date}/${month}/${year}`;
+                    } catch (e) {
+                      formattedTime = act.timestamp;
+                    }
+
+                    const studentRecord = studentResults.find(
+                      (s) =>
+                        s.name.trim().toLowerCase() === act.studentName.trim().toLowerCase() &&
+                        s.className.trim().toUpperCase() === act.className.trim().toUpperCase()
+                    );
+                    const gpa = studentRecord ? studentRecord.score.toFixed(1) : "0.0";
+
+                    return (
+                      <tr key={act.id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 font-bold text-slate-900">{act.studentName}</td>
+                        <td className="py-2.5 text-slate-900 font-mono font-bold">12{act.className.replace("12", "")}</td>
+                        <td className="py-2.5 text-slate-800 font-semibold">{act.description}</td>
+                        <td className="py-2.5 text-center">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            act.activityType === "quiz"
+                              ? scoreText.includes("10") || scoreText.includes("9") || scoreText.includes("8")
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-slate-100 text-slate-600 border border-slate-200"
+                          }`}>
+                            {scoreText}
+                          </span>
+                        </td>
+                        <td className="py-2.5 font-mono text-slate-500 hidden md:table-cell">{formattedTime}</td>
+                        <td className="py-2.5 text-right font-mono font-black text-cyan-700">{gpa}</td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-slate-800 font-mono font-bold">
+                      Không tìm thấy kết quả luyện tập nào trong bộ lọc.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Restore options */}
         <div className="border-t-2 border-slate-300 mt-4 pt-3 flex justify-between items-center text-[10.5px] text-slate-900 font-bold">
@@ -808,6 +1486,125 @@ export function TeacherDashboard({ studentResults, onUpdateResults }: TeacherDas
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Supabase & Vercel Database Connection Card */}
+        <div className="block-3d-blue no-override no-override-bg rounded-3xl p-5 flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 border-b-2 border-sky-300 pb-2.5 mb-2.5">
+              <Database className="h-4.5 w-4.5 text-sky-900 font-black" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-sky-950">Tích hợp Supabase & Vercel</h3>
+            </div>
+            
+            <p className="text-[11px] text-sky-950 font-bold leading-relaxed mb-3">
+              Đồng bộ bảng điểm trực tiếp với cơ sở dữ liệu đám mây Supabase PostgreSQL của bạn thông qua môi trường Vercel Marketplace.
+            </p>
+
+            {/* Connection status indicator */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
+                supabaseConfigured ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+              }`}>
+                <CheckCircle className="h-3 w-3 shrink-0" />
+                Vercel Config: {supabaseConfigured ? "Đã nhận diện" : "Dùng mặc định"}
+              </span>
+
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
+                supabaseTableExists ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Bảng DB: {supabaseTableExists ? `Sẵn sàng (${supabaseTableName})` : `Chưa tạo (${supabaseTableName})`}
+              </span>
+            </div>
+
+            {supabaseStatusMsg && (
+              <div className="text-sky-900 text-[10px] font-bold bg-sky-50 border border-sky-200 rounded-lg p-2 mb-3 animate-pulse">
+                ✨ {supabaseStatusMsg}
+              </div>
+            )}
+
+            {supabaseError && (
+              <div className="text-red-700 text-[10px] font-bold bg-red-50 border border-red-200 rounded-lg p-2 mb-3">
+                ⚠️ {supabaseError}
+              </div>
+            )}
+
+            <div className="space-y-3 pt-1">
+              <div className="p-2.5 bg-white/60 border border-sky-200 rounded-xl text-[10px] space-y-1">
+                <div className="text-slate-500 font-bold uppercase text-[8.5px]">Project ID:</div>
+                <div className="font-mono font-bold text-slate-800 select-all">{supabaseProjectRef}</div>
+                <a
+                  href={`https://supabase.com/dashboard/project/${supabaseProjectRef}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-700 hover:text-sky-800 font-extrabold inline-flex items-center gap-1 text-[9.5px] underline mt-1"
+                >
+                  Mở Bảng điều khiển Supabase <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+
+              {(!supabaseTableExists || showSqlHelp) ? (
+                <div className="space-y-1.5 p-2.5 bg-slate-900 text-slate-100 rounded-xl font-mono text-[9px] relative overflow-hidden">
+                  <div className="flex justify-between items-center text-slate-400 font-bold uppercase text-[8px] pb-1.5 border-b border-slate-800">
+                    <span>Cần chạy SQL trên Supabase:</span>
+                    <div className="flex gap-1.5">
+                      {supabaseTableExists && (
+                        <button 
+                          onClick={() => setShowSqlHelp(false)}
+                          className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-[8px] uppercase border-none cursor-pointer"
+                        >
+                          Ẩn
+                        </button>
+                      )}
+                      <button 
+                        onClick={handleCopySql}
+                        className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-[8px] uppercase border-none cursor-pointer"
+                      >
+                        {copiedSql ? "Đã sao chép!" : "Copy SQL"}
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="max-h-[140px] overflow-y-auto whitespace-pre-wrap select-all leading-normal text-slate-300">
+                    {sqlScript}
+                  </pre>
+                  {supabaseTableExists && (
+                    <div className="text-[8px] text-amber-400 font-sans mt-1 leading-normal">
+                      💡 Mẹo: Chạy đoạn mã này trong SQL Editor của Supabase để cài đặt/sửa lỗi phân quyền (RLS) hoặc đồng bộ cấu trúc cho bảng <strong>{supabaseTableName}</strong>.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-right">
+                  <button
+                    onClick={() => setShowSqlHelp(true)}
+                    className="text-sky-700 hover:text-sky-800 font-black text-[9.5px] underline border-none bg-transparent cursor-pointer"
+                  >
+                    Xem mã lệnh SQL cấu hình bảng & RLS
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSyncToSupabase}
+                  disabled={supabaseSyncing}
+                  className="flex-1 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-black rounded-xl text-[10px] transition-all cursor-pointer border-none shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${supabaseSyncing ? 'animate-spin' : ''}`} />
+                  Đẩy lên Supabase
+                </button>
+
+                <button
+                  onClick={handlePullFromSupabase}
+                  disabled={supabaseSyncing}
+                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-700 text-white font-black rounded-xl text-[10px] transition-all cursor-pointer border-none shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Tải từ Supabase
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

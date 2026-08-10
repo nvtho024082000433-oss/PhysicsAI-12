@@ -1,11 +1,12 @@
 {
-  "projectId": "gen-lang-client-0242829643",
-  "appId": "1:372545023629:web:836c0e9146b8936a197cc4",
-  "apiKey": "AIzaSyCADI-2NlZtzYXvfg5wBAVIcjXhBw8U42Q",
-  "authDomain": "gen-lang-client-0242829643.firebaseapp.com",
-  "storageBucket": "gen-lang-client-0242829643.firebasestorage.app",
-  "messagingSenderId": "372545023629",
-  "measurementId": "",
-  "oAuthClientId": "372545023629-gilqubopukkq0b86j7h9ro9ghdkoeqks.apps.googleusercontent.com",
+  "projectId": "data-physic-12",
+  "appId": "1:318734422978:web:0521e22c93a0b5d266bc5b",
+  "apiKey": "AIzaSyDTn9eeHU5LdKvU6zV94Dfr9SvpaDBivEw",
+  "authDomain": "data-physic-12.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-physicsai12-79fa31ee-a48b-4479-accb-434010c56769",
+  "storageBucket": "data-physic-12.appspot.com",
+  "messagingSenderId": "318734422978",
+  "measurementId": "G-PJR3H2X9LH",
+  "oAuthClientId": "318734422978-onenurkvmg8fuulut4v6fbg3vb536h3g.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

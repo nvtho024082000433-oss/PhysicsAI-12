@@ -1,9 +1,9 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import * as dotenv from "dotenv";
 import mammoth from "mammoth";
+import fs from "fs";
 import {
   getLocalPhysicsResponse,
   getLocalExamResponse,
@@ -39,6 +39,638 @@ const checkApiKey = () => {
   }
   return true;
 };
+
+// Helper function to sanitize error messages and translate them to friendly, actionable alerts
+function cleanErrorMessage(errorMsg: string): string {
+  if (!errorMsg) return "Không thể kết nối";
+  
+  // Clean up any exposed API keys in the error string to keep keys hidden
+  let cleaned = errorMsg.replace(/AIzaSy[a-zA-Z0-9-_]{33}/g, "AIzaSy***");
+  
+  if (cleaned.includes("suspended") || cleaned.includes("Consumer 'api_key") || cleaned.includes("PERMISSION_DENIED")) {
+    return "Khóa API đã bị Google tạm ngưng (Suspended/403). Quý Thầy/Cô hãy kiểm tra hoặc cập nhật khóa GEMINI_API_KEY mới trong mục Cài đặt (Settings) -> Secrets ở góc trên bên phải AI Studio.";
+  }
+  if (cleaned.includes("quota") || cleaned.includes("exhausted") || cleaned.includes("limit")) {
+    return "Vượt quá giới hạn lượt dùng thử miễn phí trong ngày (Quota Exceeded). Vui lòng thử lại sau hoặc dán khóa GEMINI_API_KEY cá nhân của bạn trong phần Cài đặt (Settings) ở góc trên bên phải AI Studio.";
+  }
+  if (cleaned.includes("violates row-level security policy") || cleaned.includes("insufficient_privilege") || cleaned.includes("permission denied")) {
+    return "Lỗi bảo mật RLS trên Supabase. Quý Thầy/Cô hãy kiểm tra cấu hình Row Level Security (RLS) của bảng trên Supabase, đảm bảo đã kích hoạt chính sách (Policies) cho phép Đọc (SELECT) và Ghi (INSERT/UPDATE/UPSERT) cho vai trò anon/public, hoặc tạm thời TẮT (Disable) tính năng RLS của bảng đó để kiểm tra thử nhé.";
+  }
+  return cleaned;
+}
+
+// ==========================================
+// API: SUPABASE BACKEND PROXY & SYNC
+// ==========================================
+import { createClient } from "@supabase/supabase-js";
+
+const getSupabaseServerClient = () => {
+  let projectRef = "guajmfmzkseypwwzcrck";
+  const postgresUrl = process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || "";
+  if (postgresUrl) {
+    const match = postgresUrl.match(/postgres\.([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      projectRef = match[1];
+    }
+  }
+  const supabaseUrl = process.env.STORAGE_URL ||
+                      process.env.SUPABASE_URL || 
+                      process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                      `https://${projectRef}.supabase.co`;
+  const supabaseKey = process.env.STORAGE_ANON_KEY ||
+                      process.env.STORAGE_PUBLISHABLE_KEY ||
+                      process.env.STORAGE_SERVICE_ROLE_KEY ||
+                      process.env.SUPABASE_ANON_KEY || 
+                      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                      process.env.SUPABASE_PUBLISHABLE_KEY || 
+                      "sb_publishable_UHBkV7d_T95SuO9TtVIrXw_aeNo73rH";
+  
+  return createClient(supabaseUrl, supabaseKey);
+};
+
+// Helper to map dynamic Supabase rows (supporting both student_results and ket_qua_hoc_tap_vat_li_12)
+function mapSupabaseRowToStudent(item: any): any {
+  const nameKeys = ["name", "Họ và tên", "Họ và Tên", "ho_va_ten", "Name"];
+  let name = "";
+  for (const k of nameKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      name = String(item[k]);
+      break;
+    }
+  }
+
+  const classKeys = ["class_name", "Lớp", "Lớp học", "lop", "className", "Class"];
+  let className = "";
+  for (const k of classKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      className = String(item[k]);
+      break;
+    }
+  }
+
+  const scoreKeys = ["score", "Điểm học tập (GPA)", "Điểm số trung bình (GPA)", "Điểm số", "diem_so", "Score", "gpa", "GPA"];
+  let score = 0;
+  for (const k of scoreKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      score = Number(String(item[k]).replace(/[^\d.-]/g, "")) || 0;
+      break;
+    }
+  }
+
+  const progressKeys = ["progress", "Tiến độ học (%)", "Tiến độ học tập (%)", "Tiến độ", "tien_do", "Progress"];
+  let progress = 0;
+  for (const k of progressKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      progress = Number(String(item[k]).replace(/[^\d.-]/g, "")) || 0;
+      break;
+    }
+  }
+
+  const quizKeys = ["completed_quizzes", "Số câu trắc nghiệm đúng", "Số bài thi đã làm", "completedQuizzes", "so_cau_dung"];
+  let completedQuizzes = 0;
+  for (const k of quizKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      completedQuizzes = Number(String(item[k]).replace(/[^\d.-]/g, "")) || 0;
+      break;
+    }
+  }
+
+  const xpKeys = ["xp", "Tích lũy XP", "Tổng XP tích lũy", "XP", "xp_tich_luy"];
+  let xp = 0;
+  for (const k of xpKeys) {
+    if (item[k] !== undefined && item[k] !== null) {
+      xp = Number(String(item[k]).replace(/[^\d.-]/g, "")) || 0;
+      break;
+    }
+  }
+
+  return {
+    name: name.trim(),
+    className: className.trim(),
+    score,
+    progress,
+    completedQuizzes,
+    xp
+  };
+}
+
+// Helper to build a record that conforms to the table columns
+function buildSupabaseRecord(student: any, columns: string[], defaultToVietnamese: boolean): any {
+  const record: any = {};
+  
+  const setVal = (keys: string[], val: any) => {
+    if (columns && columns.length > 0) {
+      for (const k of keys) {
+        if (columns.includes(k)) {
+          record[k] = val;
+          return;
+        }
+      }
+    }
+    if (defaultToVietnamese) {
+      const viKey = keys.find(k => k.match(/^[^\x00-\x7F]/) || k.includes(" ") || k.includes("%"));
+      if (viKey) {
+        record[viKey] = val;
+        return;
+      }
+    }
+    record[keys[0]] = val;
+  };
+
+  setVal(["id", "ID"], `${student.className.trim().toUpperCase()}_${student.name.trim().toLowerCase()}`);
+  setVal(["name", "Họ và tên", "Họ và Tên", "ho_va_ten", "Name"], student.name.trim());
+  setVal(["class_name", "Lớp", "Lớp học", "lop", "className", "Class"], student.className.trim());
+  setVal(["score", "Điểm học tập (GPA)", "Điểm số trung bình (GPA)", "Điểm số", "diem_so", "Score", "GPA"], Number(student.score || 0));
+  setVal(["progress", "Tiến độ học (%)", "Tiến độ học tập (%)", "Tiến độ", "tien_do", "Progress"], Number(student.progress || 0));
+  setVal(["completed_quizzes", "Số câu trắc nghiệm đúng", "Số bài thi đã làm", "completedQuizzes", "so_cau_dung"], Number(student.completedQuizzes || 0));
+  setVal(["xp", "Tích lũy XP", "Tổng XP tích lũy", "XP", "xp_tich_luy"], Number(student.xp || 0));
+  setVal(["updated_at", "Cập nhật", "updatedAt", "Updated At"], new Date().toISOString());
+
+  return record;
+}
+
+// Helper to discover the available table name, schema, and existence status
+async function getSupabaseTableInfo(client: any) {
+  // Try student_results first
+  const { data: d1, error: err1 } = await client.from("student_results").select("*").limit(1);
+  if (!err1 || (err1.code !== "42P01" && err1.code !== "PGRST116")) {
+    let columns = d1 && d1[0] ? Object.keys(d1[0]) : [];
+    if (columns.length === 0) {
+      columns = ["id", "name", "class_name", "score", "progress", "completed_quizzes", "xp", "updated_at"];
+    }
+    return {
+      tableName: "student_results",
+      tableExists: true,
+      columns,
+      error: err1 ? err1.message : null
+    };
+  }
+  
+  // Try ket_qua_hoc_tap_vat_li_12
+  const { data: d2, error: err2 } = await client.from("ket_qua_hoc_tap_vat_li_12").select("*").limit(1);
+  if (!err2 || (err2.code !== "42P01" && err2.code !== "PGRST116")) {
+    let columns = d2 && d2[0] ? Object.keys(d2[0]) : [];
+    if (columns.length === 0) {
+      columns = ["id", "Họ và tên", "Lớp", "Điểm học tập (GPA)", "Tiến độ học (%)", "Số câu trắc nghiệm đúng", "Tích lũy XP", "Cập nhật"];
+    }
+    return {
+      tableName: "ket_qua_hoc_tap_vat_li_12",
+      tableExists: true,
+      columns,
+      error: err2 ? err2.message : null
+    };
+  }
+  
+  // Try ket_qua_hoc_tap_vat_li_12 (with a dot since Vercel URL has public.ket_qua_hoc_tap_vat_li_12.)
+  const { data: d3, error: err3 } = await client.from("ket_qua_hoc_tap_vat_li_12.").select("*").limit(1);
+  if (!err3 || (err3.code !== "42P01" && err3.code !== "PGRST116")) {
+    let columns = d3 && d3[0] ? Object.keys(d3[0]) : [];
+    if (columns.length === 0) {
+      columns = ["id", "Họ và tên", "Lớp", "Điểm học tập (GPA)", "Tiến độ học (%)", "Số câu trắc nghiệm đúng", "Tích lũy XP", "Cập nhật"];
+    }
+    return {
+      tableName: "ket_qua_hoc_tap_vat_li_12.",
+      tableExists: true,
+      columns,
+      error: err3 ? err3.message : null
+    };
+  }
+  
+  return {
+    tableName: "student_results",
+    tableExists: false,
+    columns: [],
+    error: err1 ? err1.message : (err2 ? err2.message : "Table not found")
+  };
+}
+
+// Check connection status
+app.get("/api/supabase/status", async (req, res) => {
+  try {
+    let projectRef = "guajmfmzkseypwwzcrck";
+    const postgresUrl = process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || "";
+    if (postgresUrl) {
+      const match = postgresUrl.match(/postgres\.([a-zA-Z0-9-_]+)/);
+      if (match && match[1]) {
+        projectRef = match[1];
+      }
+    }
+    const client = getSupabaseServerClient();
+    const tableInfo = await getSupabaseTableInfo(client);
+    
+    res.json({
+      configured: !!(
+        process.env.STORAGE_URL || 
+        process.env.STORAGE_ANON_KEY || 
+        process.env.SUPABASE_ANON_KEY || 
+        process.env.SUPABASE_PUBLISHABLE_KEY || 
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      ),
+      projectRef,
+      tableExists: tableInfo.tableExists,
+      tableName: tableInfo.tableName,
+      error: tableInfo.error ? cleanErrorMessage(tableInfo.error) : null
+    });
+  } catch (err: any) {
+    res.json({
+      configured: !!(
+        process.env.STORAGE_URL || 
+        process.env.STORAGE_ANON_KEY || 
+        process.env.SUPABASE_ANON_KEY || 
+        process.env.SUPABASE_PUBLISHABLE_KEY || 
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      ),
+      projectRef: "guajmfmzkseypwwzcrck",
+      tableExists: false,
+      tableName: "student_results",
+      error: cleanErrorMessage(err.message || "Failed to check Supabase status")
+    });
+  }
+});
+
+// Fetch results
+app.get("/api/supabase/results", async (req, res) => {
+  try {
+    const client = getSupabaseServerClient();
+    const tableInfo = await getSupabaseTableInfo(client);
+    
+    if (!tableInfo.tableExists) {
+      return res.status(400).json({ error: `Bảng dữ liệu không tồn tại trên Supabase. Thầy Cô vui lòng tạo bảng '${tableInfo.tableName}' trước nhé.` });
+    }
+
+    const { data, error } = await client
+      .from(tableInfo.tableName)
+      .select("*");
+    
+    if (error) {
+      return res.status(400).json({ error: cleanErrorMessage(error.message) });
+    }
+    
+    const results = (data || []).map(mapSupabaseRowToStudent);
+    // Sắp xếp theo XP giảm dần
+    results.sort((a: any, b: any) => (b.xp || 0) - (a.xp || 0));
+    
+    res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: cleanErrorMessage(err.message || "Failed to fetch results") });
+  }
+});
+
+// Upsert bulk
+app.post("/api/supabase/results/bulk", async (req, res) => {
+  try {
+    const { students } = req.body;
+    if (!Array.isArray(students)) {
+      return res.status(400).json({ error: "Invalid payload, 'students' must be an array" });
+    }
+    
+    const client = getSupabaseServerClient();
+    const tableInfo = await getSupabaseTableInfo(client);
+    
+    if (!tableInfo.tableExists) {
+      return res.status(400).json({ error: `Bảng dữ liệu '${tableInfo.tableName}' chưa tồn tại trên Supabase.` });
+    }
+
+    const defaultToVietnamese = tableInfo.tableName.startsWith("ket_qua_hoc_tap");
+    const records = students.map((student: any) => 
+      buildSupabaseRecord(student, tableInfo.columns, defaultToVietnamese)
+    );
+    
+    // Find the primary key / id column name
+    let idColumn = "id";
+    if (tableInfo.columns && tableInfo.columns.length > 0) {
+      if (tableInfo.columns.includes("id")) idColumn = "id";
+      else if (tableInfo.columns.includes("ID")) idColumn = "ID";
+      else if (tableInfo.columns.includes("Họ và tên")) idColumn = "Họ và tên";
+      else if (tableInfo.columns.includes("Họ và Tên")) idColumn = "Họ và Tên";
+    }
+    
+    const { error } = await client.from(tableInfo.tableName).upsert(records, { onConflict: idColumn });
+    if (error) {
+      return res.status(400).json({ error: cleanErrorMessage(error.message) });
+    }
+    
+    res.json({ success: true, count: records.length });
+  } catch (err: any) {
+    res.status(500).json({ error: cleanErrorMessage(err.message || "Failed to sync in bulk") });
+  }
+});
+
+// Helper to discover the available students table name, schema, and existence status
+async function getSupabaseStudentsTableInfo(client: any) {
+  // Try 'students' first
+  const { data: d1, error: err1 } = await client.from("students").select("*").limit(1);
+  if (!err1 || (err1.code !== "42P01" && err1.code !== "PGRST116")) {
+    let columns = d1 && d1[0] ? Object.keys(d1[0]) : [];
+    if (columns.length === 0) {
+      columns = ["id", "name", "class", "student_code", "last_login_at"];
+    }
+    return {
+      tableName: "students",
+      tableExists: true,
+      columns,
+      error: err1 ? err1.message : null
+    };
+  }
+  
+  // Try 'hoc_sinh'
+  const { data: d2, error: err2 } = await client.from("hoc_sinh").select("*").limit(1);
+  if (!err2 || (err2.code !== "42P01" && err2.code !== "PGRST116")) {
+    let columns = d2 && d2[0] ? Object.keys(d2[0]) : [];
+    if (columns.length === 0) {
+      columns = ["id", "ho_ten", "lop", "ma_hoc_sinh", "thoi_gian_dang_nhap_cuoi"];
+    }
+    return {
+      tableName: "hoc_sinh",
+      tableExists: true,
+      columns,
+      error: err2 ? err2.message : null
+    };
+  }
+  
+  return {
+    tableName: "students",
+    tableExists: false,
+    columns: ["id", "name", "class", "student_code", "last_login_at"],
+    error: err1 ? err1.message : (err2 ? err2.message : "Table not found")
+  };
+}
+
+// Helper to build a student row for Supabase
+function buildSupabaseStudentRow(student: { name: string; className: string; studentCode: string; lastLoginAt: string }, columns: string[]) {
+  const record: any = {};
+  
+  const setVal = (keys: string[], val: any) => {
+    if (columns && columns.length > 0) {
+      for (const k of keys) {
+        if (columns.includes(k)) {
+          record[k] = val;
+          return;
+        }
+      }
+    }
+    record[keys[0]] = val;
+  };
+
+  // Set ID
+  setVal(["id", "ID", "ma_hoc_sinh", "student_code"], `${student.className.trim().toUpperCase()}_${student.name.trim().toLowerCase()}`);
+  
+  // Set name
+  setVal(["name", "Họ và tên", "Họ và Tên", "ho_va_ten", "Name", "fullname", "full_name"], student.name.trim());
+  
+  // Set class
+  setVal(["class", "class_name", "Lớp", "Lớp học", "lop", "className", "Class"], student.className.trim());
+  
+  // Set student code
+  setVal(["student_code", "student_id", "ma_hoc_sinh", "Mã học sinh", "maHocSinh", "studentCode", "code"], student.studentCode.trim());
+  
+  // Set last login time
+  setVal(["last_login_at", "lastLoginAt", "Thời gian đăng nhập cuối", "thoi_gian_dang_nhap_cuoi", "last_login", "updated_at"], student.lastLoginAt);
+
+  return record;
+}
+
+// Student login / collect info endpoint
+app.post("/api/supabase/students/login", async (req, res) => {
+  try {
+    const { name, className, studentCode } = req.body;
+    if (!name || !className) {
+      return res.status(400).json({ error: "Thiếu họ tên hoặc tên lớp học." });
+    }
+
+    const client = getSupabaseServerClient();
+    const tableInfo = await getSupabaseStudentsTableInfo(client);
+
+    if (!tableInfo.tableExists) {
+      return res.status(400).json({ 
+        error: `Bảng dữ liệu 'students' (hoặc 'hoc_sinh') chưa tồn tại trên Supabase. Thầy Cô vui lòng tạo bảng '${tableInfo.tableName}' trước nhé.`,
+        isTableMissing: true
+      });
+    }
+
+    const columns = tableInfo.columns;
+    const tableName = tableInfo.tableName;
+
+    // Detect the correct name column dynamically
+    const nameColumn = columns.find(c => ["name", "Họ và tên", "Họ và Tên", "ho_ten", "ho_va_ten", "Name", "fullname", "full_name"].includes(c)) || "name";
+    
+    // Detect the class column dynamically
+    const classColumn = columns.find(c => ["class", "class_name", "Lớp", "Lớp học", "lop", "className", "Class"].includes(c)) || "class";
+
+    // Detect last login column dynamically
+    const lastLoginColumn = columns.find(c => ["last_login_at", "lastLoginAt", "Thời gian đăng nhập cuối", "thoi_gian_dang_nhap_cuoi", "last_login", "updated_at"].includes(c)) || "last_login_at";
+
+    // Detect student code column dynamically
+    const studentCodeColumn = columns.find(c => ["student_code", "student_id", "ma_hoc_sinh", "Mã học sinh", "maHocSinh", "studentCode", "code"].includes(c)) || "student_code";
+
+    const lastLoginAt = new Date().toISOString();
+
+    // Check if student already exists by name
+    const { data: existingRows, error: findError } = await client
+      .from(tableName)
+      .select("*");
+
+    if (findError) {
+      return res.status(400).json({ error: cleanErrorMessage(findError.message) });
+    }
+
+    const searchNameNorm = name.trim().normalize("NFC").toLowerCase();
+    const exists = (existingRows || []).find((row: any) => {
+      const val = row[nameColumn];
+      return val && String(val).trim().normalize("NFC").toLowerCase() === searchNameNorm;
+    });
+
+    if (exists) {
+      // Perform UPDATE: update the last login time and the latest class
+      const updatePayload: any = {};
+      updatePayload[classColumn] = className.trim();
+      updatePayload[lastLoginColumn] = lastLoginAt;
+      if (studentCode) {
+        updatePayload[studentCodeColumn] = studentCode.trim();
+      }
+
+      // Check if primary key is 'id' or ID or name
+      const idCol = columns.includes("id") ? "id" : (columns.includes("ID") ? "ID" : nameColumn);
+      const idVal = exists[idCol];
+
+      const { data: updatedData, error: updateError } = await client
+        .from(tableName)
+        .update(updatePayload)
+        .eq(idCol, idVal);
+
+      if (updateError) {
+        return res.status(400).json({ error: cleanErrorMessage(updateError.message) });
+      }
+
+      return res.json({ 
+        success: true, 
+        action: "update", 
+        message: "Cập nhật thời gian đăng nhập và thông tin lớp học thành công!",
+        student: { name, className, studentCode, lastLoginAt }
+      });
+    } else {
+      // Perform INSERT: insert a new student record
+      const record = buildSupabaseStudentRow({ name, className, studentCode: studentCode || "", lastLoginAt }, columns);
+      
+      const { data: insertedData, error: insertError } = await client
+        .from(tableName)
+        .insert([record]);
+
+      if (insertError) {
+        return res.status(400).json({ error: cleanErrorMessage(insertError.message) });
+      }
+
+      return res.json({ 
+        success: true, 
+        action: "insert", 
+        message: "Đăng ký thông tin học sinh mới thành công!",
+        student: { name, className, studentCode, lastLoginAt }
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: cleanErrorMessage(err.message || "Failed to process student login") });
+  }
+});
+
+// ==========================================
+// API: LOCAL FILES SERVER BACKUP PERSISTENCE
+// ==========================================
+const RESULTS_BACKUP_PATH = path.join(process.cwd(), "student_results_backup.json");
+const ACTIVITIES_BACKUP_PATH = path.join(process.cwd(), "student_activities_backup.json");
+
+// Helper functions for reading/writing backups
+function readLocalResults(): any[] {
+  try {
+    if (fs.existsSync(RESULTS_BACKUP_PATH)) {
+      const data = fs.readFileSync(RESULTS_BACKUP_PATH, "utf8");
+      return JSON.parse(data) || [];
+    }
+  } catch (e) {
+    console.error("Lỗi đọc file lưu trữ kết quả cục bộ trên server:", e);
+  }
+  return [];
+}
+
+function writeLocalResults(results: any[]) {
+  try {
+    fs.writeFileSync(RESULTS_BACKUP_PATH, JSON.stringify(results, null, 2), "utf8");
+  } catch (e) {
+    console.error("Lỗi ghi file lưu trữ kết quả cục bộ trên server:", e);
+  }
+}
+
+function readLocalActivities(): any[] {
+  try {
+    if (fs.existsSync(ACTIVITIES_BACKUP_PATH)) {
+      const data = fs.readFileSync(ACTIVITIES_BACKUP_PATH, "utf8");
+      return JSON.parse(data) || [];
+    }
+  } catch (e) {
+    console.error("Lỗi đọc file lưu trữ hoạt động cục bộ trên server:", e);
+  }
+  return [];
+}
+
+function writeLocalActivities(activities: any[]) {
+  try {
+    fs.writeFileSync(ACTIVITIES_BACKUP_PATH, JSON.stringify(activities, null, 2), "utf8");
+  } catch (e) {
+    console.error("Lỗi ghi file lưu trữ hoạt động cục bộ trên server:", e);
+  }
+}
+
+// GET /api/backup/results
+app.get("/api/backup/results", (req, res) => {
+  try {
+    const results = readLocalResults();
+    res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to read backup results" });
+  }
+});
+
+// POST /api/backup/results/bulk
+app.post("/api/backup/results/bulk", (req, res) => {
+  try {
+    const { students } = req.body;
+    if (!Array.isArray(students)) {
+      return res.status(400).json({ error: "Invalid payload, 'students' must be an array" });
+    }
+    const currentResults = readLocalResults();
+    
+    // Merge students with currentResults
+    students.forEach((student: any) => {
+      if (!student || !student.name || !student.className) return;
+      const studentNameNorm = student.name.trim().toLowerCase();
+      const idx = currentResults.findIndex(
+        (r: any) => r && r.name && r.name.trim().toLowerCase() === studentNameNorm && r.className === student.className
+      );
+      if (idx >= 0) {
+        // Merge keeping max values
+        currentResults[idx] = {
+          ...currentResults[idx],
+          ...student,
+          xp: Math.max(currentResults[idx].xp || 0, student.xp || 0),
+          score: Math.max(currentResults[idx].score || 0, student.score || 0),
+          progress: Math.max(currentResults[idx].progress || 0, student.progress || 0),
+          completedQuizzes: Math.max(currentResults[idx].completedQuizzes || 0, student.completedQuizzes || 0)
+        };
+      } else {
+        currentResults.push(student);
+      }
+    });
+
+    writeLocalResults(currentResults);
+    res.json({ success: true, count: currentResults.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to save backup results" });
+  }
+});
+
+// GET /api/backup/activities
+app.get("/api/backup/activities", (req, res) => {
+  try {
+    const activities = readLocalActivities();
+    res.json(activities);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to read backup activities" });
+  }
+});
+
+// POST /api/backup/activities
+app.post("/api/backup/activities", (req, res) => {
+  try {
+    const activity = req.body;
+    if (!activity || !activity.studentName) {
+      return res.status(400).json({ error: "Invalid activity payload" });
+    }
+    const currentActivities = readLocalActivities();
+    
+    // Check if duplicate ID
+    const exists = currentActivities.some((act: any) => act && act.id === activity.id);
+    if (!exists) {
+      currentActivities.unshift(activity); // Add to beginning (newest first)
+      // Limit to 300 activities
+      if (currentActivities.length > 300) {
+        currentActivities.splice(300);
+      }
+      writeLocalActivities(currentActivities);
+    }
+    res.json({ success: true, count: currentActivities.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to save backup activity" });
+  }
+});
+
+// POST /api/backup/activities/clear
+app.post("/api/backup/activities/clear", (req, res) => {
+  try {
+    writeLocalActivities([]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to clear backup activities" });
+  }
+});
 
 // ==========================================
 // 1. API: AI TRỢ GIẢNG (CHATBOT)
@@ -292,14 +924,11 @@ app.post("/api/gemini/chat", async (req, res) => {
 
       res.json({ text: response.text });
     } catch (apiError: any) {
-      console.warn("Gemini API call failed, falling back to local physics database:", apiError.message);
+      const cleanMsg = cleanErrorMessage(apiError.message || "");
+      console.warn("⚠️ [Gemini API] Lấy phản hồi thất bại (Khóa API có thể đã hết hạn hoặc bị đình chỉ). Đã tự động chuyển sang học liệu Vật lý 12 Ngoại tuyến.");
       const fallback = getLocalPhysicsResponse(message, mode);
       let text = fallback.text;
-      if (apiError.message && (apiError.message.includes("quota") || apiError.message.includes("exhausted") || apiError.message.includes("limit"))) {
-        text += "\n\n*(Thông báo từ hệ thống: Lỗi kết nối API do vượt quá giới hạn dùng thử miễn phí trong ngày - Quota Exceeded. Trợ lý đã chuyển đổi sang chế độ phản hồi tự động bám sát chương trình.)*";
-      } else {
-        text += `\n\n*(Thông báo từ hệ thống: Khóa API gặp sự cố [${apiError.message || "Không thể kết nối"}]. Trợ lý đã chuyển đổi sang chế độ phản hồi tự động bám sát chương trình.)*`;
-      }
+      text += `\n\n*(Thông báo từ hệ thống: Trợ lý đã chuyển sang cơ sở dữ liệu học liệu ngoại tuyến do sự cố kết nối API: [${cleanMsg}])*`;
       res.json({ text, isFallback: true });
     }
   } catch (error: any) {
@@ -498,12 +1127,17 @@ Yêu cầu trả về cấu trúc JSON chính xác theo schema sau:
     const result = JSON.parse(response.text || "{}");
     res.json(result);
   } catch (error: any) {
-    console.warn("Create exam error, falling back to offline exam generator:", error);
+    const cleanMsg = cleanErrorMessage(error.message || "");
+    console.warn("⚠️ [Gemini API] Lỗi tạo đề thi bằng AI. Đã tự động chuyển sang bộ tạo đề thi ngoại tuyến bám sát ma trận.");
     try {
       const fallback = getLocalExamResponse(chapters, ratio, p1, p2, p3);
+      if (fallback) {
+        (fallback as any).isFallback = true;
+        (fallback as any).fallbackMessage = `Sử dụng đề thi ngoại tuyến do sự cố API: ${cleanMsg}`;
+      }
       res.json(fallback);
     } catch (fallbackError) {
-      res.status(500).json({ error: error.message || "Lỗi tạo đề kiểm tra" });
+      res.status(500).json({ error: cleanMsg || "Lỗi tạo đề kiểm tra" });
     }
   }
 });
@@ -615,12 +1249,17 @@ app.post("/api/gemini/analyze-exam", async (req, res) => {
     const result = JSON.parse(response.text || "{}");
     res.json(result);
   } catch (error: any) {
-    console.warn("Analyze exam error, falling back to offline analyzer:", error);
+    const cleanMsg = cleanErrorMessage(error.message || "");
+    console.warn("⚠️ [Gemini API] Lỗi phân tích đề thi bằng AI. Đã tự động chuyển sang mô-đun phân tích ngoại tuyến.");
     try {
       const fallback = getLocalAnalyzeExamResponse(fileName, rawText);
+      if (fallback) {
+        (fallback as any).isFallback = true;
+        (fallback as any).fallbackMessage = `Sử dụng phân tích ngoại tuyến do sự cố API: ${cleanMsg}`;
+      }
       res.json(fallback);
     } catch (fallbackError) {
-      res.status(500).json({ error: error.message || "Lỗi phân tích đề thi" });
+      res.status(500).json({ error: cleanMsg || "Lỗi phân tích đề thi" });
     }
   }
 });
@@ -684,12 +1323,17 @@ app.post("/api/gemini/summarize-lesson", async (req, res) => {
 
     res.json(JSON.parse(response.text || "{}"));
   } catch (error: any) {
-    console.warn("Summarize lesson error, falling back to offline summarizer:", error);
+    const cleanMsg = cleanErrorMessage(error.message || "");
+    console.warn("⚠️ [Gemini API] Lỗi tóm tắt bài học bằng AI. Đã tự động chuyển sang mô-đun tóm tắt ngoại tuyến.");
     try {
       const fallback = getLocalSummarizeResponse(title, content);
+      if (fallback) {
+        (fallback as any).isFallback = true;
+        (fallback as any).fallbackMessage = `Sử dụng tóm tắt ngoại tuyến do sự cố API: ${cleanMsg}`;
+      }
       res.json(fallback);
     } catch (fallbackError) {
-      res.status(500).json({ error: error.message || "Lỗi tóm tắt bài học" });
+      res.status(500).json({ error: cleanMsg || "Lỗi tóm tắt bài học" });
     }
   }
 });
@@ -858,12 +1502,17 @@ app.post("/api/gemini/parse-uploaded-exercise", async (req, res) => {
     const result = JSON.parse(response.text || '{"questionsP1": [], "questionsP2": []}');
     res.json(result);
   } catch (error: any) {
-    console.warn("Parse exercise error, falling back to offline parser:", error);
+    const cleanMsg = cleanErrorMessage(error.message || "");
+    console.warn("⚠️ [Gemini API] Lỗi trích xuất tài liệu bài tập bằng AI. Đã tự động chuyển sang mô-đun trích xuất ngoại tuyến.");
     try {
       const fallback = getLocalParseExerciseResponse(fileName, textContent);
+      if (fallback) {
+        (fallback as any).isFallback = true;
+        (fallback as any).fallbackMessage = `Sử dụng trích xuất ngoại tuyến do sự cố API: ${cleanMsg}`;
+      }
       res.json(fallback);
     } catch (fallbackError) {
-      res.status(500).json({ error: error.message || "Lỗi đọc tài liệu bài tập bằng AI" });
+      res.status(500).json({ error: cleanMsg || "Lỗi đọc tài liệu bài tập bằng AI" });
     }
   }
 });
@@ -871,6 +1520,7 @@ app.post("/api/gemini/parse-uploaded-exercise", async (req, res) => {
 // Serve Vite middleware in development or build outputs in production
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

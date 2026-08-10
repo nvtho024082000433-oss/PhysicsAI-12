@@ -57,20 +57,25 @@ export interface StudentResult {
   xp: number;
 }
 
-export const DEFAULT_STUDENT_RESULTS: StudentResult[] = [
-  { name: "Nguyễn Minh Đức", className: "12A1", score: 9.2, progress: 85, completedQuizzes: 12, xp: 2450 },
-  { name: "Phạm Hà Phương", className: "12A1", score: 8.8, progress: 92, completedQuizzes: 15, xp: 2800 },
-  { name: "Lê Hoàng Nam", className: "12A1", score: 7.5, progress: 78, completedQuizzes: 10, xp: 1900 },
-  { name: "Trần Bảo Ngọc", className: "12A1", score: 4.8, progress: 60, completedQuizzes: 5, xp: 1200 },
-  { name: "Vũ Quốc Đạt", className: "12A1", score: 5.2, progress: 45, completedQuizzes: 4, xp: 950 },
-  { name: "Trịnh Thị Mai", className: "12A2", score: 8.5, progress: 80, completedQuizzes: 11, xp: 2200 },
-  { name: "Hoàng Văn Tuấn", className: "12A2", score: 6.8, progress: 72, completedQuizzes: 8, xp: 1650 },
-  { name: "Đỗ Kim Chi", className: "12A2", score: 9.5, progress: 95, completedQuizzes: 16, xp: 3100 },
-  { name: "Nguyễn Văn Hùng", className: "12A3", score: 7.0, progress: 65, completedQuizzes: 7, xp: 1500 },
-  { name: "Bùi Thanh Lâm", className: "12A3", score: 8.2, progress: 82, completedQuizzes: 12, xp: 2350 },
-  { name: "Lâm Mỹ Tâm", className: "12A4", score: 7.9, progress: 75, completedQuizzes: 9, xp: 1800 },
-  { name: "Phan Anh Tuấn", className: "12A4", score: 5.5, progress: 50, completedQuizzes: 6, xp: 1100 }
-];
+export interface StudentActivity {
+  id: string;
+  studentName: string;
+  className: string;
+  activityType: string; // e.g. "quiz", "lesson", "virtual_lab", "ai_chat", "formula_library", etc.
+  description: string;
+  xpGained: number;
+  timestamp: string;
+  
+  // Vietnamese fallback fields for database visual clarity
+  hoVaTen?: string;
+  lop?: string;
+  loaiHoatDong?: string;
+  moTa?: string;
+  xpNhanDuoc?: number;
+  thoiGian?: string;
+}
+
+export const DEFAULT_STUDENT_RESULTS: StudentResult[] = [];
 
 // // 1. CHƯƠNG TRÌNH VẬT LÍ 12 GDPT 2018
 export const ACADEMIC_CHAPTERS: Chapter[] = [
