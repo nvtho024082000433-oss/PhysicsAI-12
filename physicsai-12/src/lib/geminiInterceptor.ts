@@ -11,16 +11,23 @@ const originalFetch = window.fetch;
 
 // A helper function to safely run direct client-side Gemini requests
 async function runClientSideGemini(url: string, bodyObj: any): Promise<any> {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (window as any).GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || "";
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                 (window as any).GEMINI_API_KEY || 
+                 (process.env as any).GEMINI_API_KEY || 
+                 localStorage.getItem("GEMINI_API_KEY") || 
+                 localStorage.getItem("VITE_GEMINI_API_KEY") || 
+                 (import.meta as any).env?.GEMINI_API_KEY || 
+                 "";
   
   if (!apiKey) {
-    throw new Error("Không tìm thấy GEMINI_API_KEY ở môi trường máy khách hoặc Cài đặt. Vui lòng thiết lập VITE_GEMINI_API_KEY hoặc GEMINI_API_KEY để sử dụng chế độ dự phòng trực tiếp.");
+    throw new Error("Chưa cấu hình API Key cho Trợ lý AI. Vui lòng kiểm tra lại thiết lập.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
   const modelName = "gemini-2.5-flash";
 
-  if (url.includes("/api/gemini/chat")) {
+  try {
+    if (url.includes("/api/gemini/chat")) {
     const { message, history, mode } = bodyObj;
     
     let systemInstruction = "Bạn là Chuyên gia Vật Lí 12 xuất sắc.";
@@ -395,6 +402,11 @@ Hãy xuất bản tóm tắt bài học dưới dạng JSON gồm:
   }
 
   throw new Error(`Endpoint không được hỗ trợ dự phòng trên máy khách: ${url}`);
+  } catch (error: any) {
+    console.error("Lỗi Google Gemini API:", error);
+    const apiErrorMsg = error.message || String(error);
+    throw new Error(apiErrorMsg);
+  }
 }
 
 function getLocalFallbackData(url: string, bodyObj: any): any {
@@ -436,68 +448,45 @@ const customFetch = async function(input: RequestInfo | URL, init?: RequestInit)
     }
 
     try {
-      const response = await originalFetch(input, init);
-      
-      if (!response.ok) {
-        let isServerError = response.status === 500;
-        let isInvocationFailed = false;
-        let errorBody = "";
-        
-        try {
-          const clonedRes = response.clone();
-          errorBody = await clonedRes.text();
-          if (errorBody.includes("FUNCTION_INVOCATION_FAILED") || errorBody.includes("server error")) {
-            isInvocationFailed = true;
-          }
-        } catch (_) {}
-
-        if (isServerError || isInvocationFailed) {
-          console.warn(`[Vercel Fallback Interceptor] Backend returned ${response.status}. Attempting direct client-side Gemini call...`);
-          try {
-            const result = await runClientSideGemini(urlStr, bodyObj);
-            return new Response(JSON.stringify(result), {
-              status: 200,
-              headers: {
-                "Content-Type": "application/json",
-                "X-Direct-Client-Fallback": "true"
-              }
-            });
-          } catch (fallbackError: any) {
-            console.warn(`[Vercel Fallback Interceptor] Client-side Gemini failed: ${fallbackError.message}. Triggering offline local database...`);
-            const fallbackResult = getLocalFallbackData(urlStr, bodyObj);
-            return new Response(JSON.stringify(fallbackResult), {
-              status: 200,
-              headers: {
-                "Content-Type": "application/json",
-                "X-Local-Offline-Fallback": "true"
-              }
-            });
-          }
+      // 1. Chuyển sang gọi trực tiếp Gemini API ở phía Client (Front-end) ngay từ đầu để tránh lỗi serverless Vercel
+      console.log(`[Gemini Client Interceptor] Đang gọi trực tiếp client-side SDK cho ${urlStr}`);
+      const result = await runClientSideGemini(urlStr, bodyObj);
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Direct-Client-Call": "true"
         }
-      }
-      return response;
-    } catch (networkError: any) {
-      console.warn(`[Vercel Fallback Interceptor] Network error detected: ${networkError.message}. Triggering client-side fallback...`);
-      try {
-        const result = await runClientSideGemini(urlStr, bodyObj);
-        return new Response(JSON.stringify(result), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Direct-Client-Fallback": "true"
-          }
-        });
-      } catch (fallbackError: any) {
-        console.warn(`[Vercel Fallback Interceptor] Client-side Gemini failed: ${fallbackError.message}. Triggering offline local database...`);
-        const fallbackResult = getLocalFallbackData(urlStr, bodyObj);
-        return new Response(JSON.stringify(fallbackResult), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Local-Offline-Fallback": "true"
-          }
+      });
+    } catch (clientError: any) {
+      const errMsg = clientError.message || "";
+      console.warn(`[Gemini Client Interceptor] Lỗi khi gọi trực tiếp client-side: ${errMsg}`);
+      
+      // 2. Nếu không tìm thấy hoặc chưa cấu hình API Key, hiển thị thông báo thân thiện
+      if (errMsg.includes("Chưa cấu hình API Key")) {
+        if (urlStr.includes("/api/gemini/chat")) {
+          return new Response(JSON.stringify({ text: "Chưa cấu hình API Key cho Trợ lý AI. Vui lòng kiểm tra lại thiết lập." }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        // Cho các api tạo đề, chấm điểm, v.v. trả về thông tin lỗi thân thiện
+        return new Response(JSON.stringify({ error: errMsg }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
         });
       }
+
+      // 3. Nếu gặp các sự cố API khác (ví dụ: hết hạn, quá hạn mức/quota, quá tải), hãy kích hoạt học liệu Vật lý 12 Ngoại tuyến
+      console.warn(`[Gemini Client Interceptor] Kích hoạt học liệu Vật lý 12 Ngoại tuyến...`);
+      const fallbackResult = getLocalFallbackData(urlStr, bodyObj);
+      return new Response(JSON.stringify(fallbackResult), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Local-Offline-Fallback": "true"
+        }
+      });
     }
   }
 
